@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Virtual Background test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .controls label { display: block; margin: 5px 0; }
+        .controls input[type=range] { width: 200px; }
+        .controls span { display: inline-block; width: 40px; text-align: right; margin-left: 5px; }
+        video { width: 100%; max-height: 90vh; }
+    </style>
+</head>
+<body>
+    <div>
+        <label>Webcam: <select id="webcamSelect"></select></label>
+        <label>Width: <input type="number" id="webcamWidth" min="160" max="1920" step="1" value="1280"></label>
+        <label>Height: <input type="number" id="webcamHeight" min="120" max="1080" step="1" value="720"></label>
+        <button id="startButton">Start</button>
+        <br> <label for="bgUpload">Change Background:</label> <input type="file" id="bgUpload" accept="image/*">
+    </div>
+    <div id="container">
+        <video id="video"></video>
+    </div>
+    <hr>
+    <div class="controls">
+        <label>Contrast: <input type="range" id="contrast" min="0.1" max="4" step="0.1" value="1"><span id="contrastVal">1.0</span></label>
+        <label>Brightness: <input type="range" id="brightness" min="-1" max="1" step="0.01" value="0"><span id="brightnessVal">0</span></label>
+        <label>Gamma: <input type="range" id="gamma" min="0.1" max="20" step="0.1" value="1"><span id="gammaVal">1.0</span></label>
+        <label>Blur: <input type="range" id="blur" min="0" max="100" step="1" value="0"><span id="blurVal">0</span></label>
+        <label>Smoothing Factor: <input type="range" id="smoothing" min="0.01" max="1.0" step="0.01" value="0.75"><span id="smoothingVal">0.75</span></label>
+        <label>Smoothstep Min: <input type="range" id="smoothstepMin" min="0.0" max="1.0" step="0.01" value="0.6"><span id="smoothstepMinVal">0.6</span></label>
+        <label>Smoothstep Max: <input type="range" id="smoothstepMax" min="0.0" max="1.0" step="0.01" value="0.9"><span id="smoothstepMaxVal">0.9</span></label>
+    </div>
+    <script>
+        // Add listeners to update value displays
+        document.querySelectorAll('.controls input[type=range]').forEach(input => {
+            const span = document.getElementById(input.id + 'Val');
+            if (span) {
+                span.textContent = input.value;
+                input.addEventListener('input', () => span.textContent = input.value);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const video = document.getElementById('video');
+
+            const webcamSelect = document.getElementById('webcamSelect');
+            const webcamWidth = document.getElementById('webcamWidth');
+            const webcamHeight = document.getElementById('webcamHeight');
+            const startButton = document.getElementById('startButton');
+
+            const smoothingInput = document.getElementById('smoothing');
+            const smoothstepMinInput = document.getElementById('smoothstepMin');
+            const smoothstepMaxInput = document.getElementById('smoothstepMax');
+            const bgUploadInput = document.getElementById('bgUpload');
+
+            const contrastInput = document.getElementById('contrast');
+            const brightnessInput = document.getElementById('brightness');
+            const gammaInput = document.getElementById('gamma');
+            const blurInput = document.getElementById('blur');
+            const sigmaInput = document.getElementById('sigma');
+            const filterInput = document.getElementById('filter');
+
+            startButton.addEventListener('click', async () => {
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach((track) => track.stop());
+                    video.srcObject = null;
+                    startButton.innerText = 'Start';
+                } else {
+                    const mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: webcamWidth.value },
+                            height: { ideal: webcamHeight.value },
+                            frameRate: { ideal: 25 },
+                            deviceId: webcamSelect.value ? { exact: webcamSelect.value } : undefined,
+                        },
+                        audio: false,
+                    });
+                    const track = mediaStream.getVideoTracks()[0];
+                    const newTrack = await VirtualBackground.processVideoTrack(track, { localAssets: true });
+                    mediaStream.removeTrack(track);
+                    mediaStream.addTrack(newTrack);
+                    video.srcObject = mediaStream;
+                    video.play();
+                    startButton.innerText = 'Stop';
+                }
+            });
+
+            bgUploadInput.addEventListener('change', async (event) => {
+                const files = event.target.files;
+                if (files && files.length > 0) {
+                    const file = files[0];
+                    const imageUrl = URL.createObjectURL(file);
+                    VirtualBackground.options.backgroundImageUrl = imageUrl;
+                }
+            });
+
+            brightnessInput.addEventListener('input', () => {
+                VirtualBackground.options.brightness = parseFloat(brightnessInput.value);
+            });
+            contrastInput.addEventListener('input', () => {
+                VirtualBackground.options.contrast = parseFloat(contrastInput.value);
+            });
+            gammaInput.addEventListener('input', () => {
+                VirtualBackground.options.gamma = parseFloat(gammaInput.value);
+            });
+            blurInput.addEventListener('input', () => {
+                VirtualBackground.options.blur = parseFloat(blurInput.value);
+            });
+            smoothingInput.addEventListener('input', () => {
+                VirtualBackground.options.smoothing = parseFloat(smoothingInput.value);
+            });
+            smoothstepMinInput.addEventListener('input', () => {
+                VirtualBackground.options.smoothstepMin = parseFloat(smoothstepMinInput.value);
+            });
+            smoothstepMaxInput.addEventListener('input', () => {
+                VirtualBackground.options.smoothstepMax = parseFloat(smoothstepMaxInput.value);
+            });
+
+            const mediaSource = await navigator.mediaDevices.getUserMedia({ video: true });
+            mediaSource.getVideoTracks().forEach((track) => track.stop());
+            const webcams = await navigator.mediaDevices.enumerateDevices();
+            webcamSelect.childNodes.forEach((child) => child.remove());
+            webcams
+                .filter((camera) => camera.kind === 'videoinput')
+                .forEach((camera) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    option.textContent = camera.label;
+                    webcamSelect.appendChild(option);
+                });
+        });
+    </script>
+</body>
+</html> 
