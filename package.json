@@ -18,7 +18,8 @@
     "start": "webpack serve --open",
     "clean": "rm -rf dist",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix"
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" index.html"
   },
   "license": "AGPL-3.0-only",
   "dependencies": {

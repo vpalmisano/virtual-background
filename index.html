@@ -1,136 +1,412 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>Virtual Background test</title>
-    <style>
-        body { font-family: sans-serif; margin: 20px; }
-        .controls label { display: block; margin: 5px 0; }
-        .controls input[type=range] { width: 200px; }
-        .controls span { display: inline-block; width: 40px; text-align: right; margin-left: 5px; }
-        video { width: 100%; max-height: 90vh; }
-    </style>
-</head>
-<body>
-    <div>
-        <label>Webcam: <select id="webcamSelect"></select></label>
-        <label>Width: <input type="number" id="webcamWidth" min="160" max="1920" step="1" value="1280"></label>
-        <label>Height: <input type="number" id="webcamHeight" min="120" max="1080" step="1" value="720"></label>
-        <button id="startButton">Start</button>
-        <br> <label for="bgUpload">Change Background:</label> <input type="file" id="bgUpload" accept="image/*">
-    </div>
-    <div id="container">
-        <video id="video"></video>
-    </div>
-    <hr>
-    <div class="controls">
-        <label>Contrast: <input type="range" id="contrast" min="0.1" max="4" step="0.1" value="1"><span id="contrastVal">1.0</span></label>
-        <label>Brightness: <input type="range" id="brightness" min="-1" max="1" step="0.01" value="0"><span id="brightnessVal">0</span></label>
-        <label>Gamma: <input type="range" id="gamma" min="0.1" max="20" step="0.1" value="1"><span id="gammaVal">1.0</span></label>
-        <label>Blur: <input type="range" id="blur" min="0" max="100" step="1" value="0"><span id="blurVal">0</span></label>
-        <label>Smoothing Factor: <input type="range" id="smoothing" min="0.01" max="1.0" step="0.01" value="0.75"><span id="smoothingVal">0.75</span></label>
-        <label>Smoothstep Min: <input type="range" id="smoothstepMin" min="0.0" max="1.0" step="0.01" value="0.6"><span id="smoothstepMinVal">0.6</span></label>
-        <label>Smoothstep Max: <input type="range" id="smoothstepMax" min="0.0" max="1.0" step="0.01" value="0.9"><span id="smoothstepMaxVal">0.9</span></label>
-    </div>
-    <script>
-        // Add listeners to update value displays
-        document.querySelectorAll('.controls input[type=range]').forEach(input => {
-            const span = document.getElementById(input.id + 'Val');
-            if (span) {
-                span.textContent = input.value;
-                input.addEventListener('input', () => span.textContent = input.value);
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Virtual Background Demo</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdn.jsdelivr.net/npm/@mdi/font@latest/css/materialdesignicons.min.css"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/vuetify/3.7.8/vuetify.min.css"
+            rel="stylesheet"
+        />
+        <style>
+            video {
+                width: 100%;
+                max-height: 70vh;
             }
-        });
+        </style>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/vuetify/3.7.8/vuetify.min.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <v-app>
+                <v-app-bar app color="primary" density="compact">
+                    <v-app-bar-title>Virtual Background Demo</v-app-bar-title>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        icon
+                        href="https://github.com/vpalmisano/virtual-background"
+                        target="_blank"
+                        rel="noopener"
+                    >
+                        <v-icon>mdi-github</v-icon>
+                    </v-btn>
+                </v-app-bar>
+                <v-main>
+                    <v-container fluid>
+                        <v-row dense>
+                            <v-col cols="4">
+                                <v-select
+                                    :items="webcams"
+                                    v-model="selectedWebcam"
+                                    item-title="title"
+                                    item-value="value"
+                                    density="compact"
+                                    variant="outlined"
+                                    placeholder="Select Webcam"
+                                ></v-select>
+                            </v-col>
+                            <v-col cols="auto">
+                                <v-text-field
+                                    v-model.number="webcamWidth"
+                                    label="Width"
+                                    type="number"
+                                    min="160"
+                                    max="1920"
+                                    step="1"
+                                    density="compact"
+                                    variant="outlined"
+                                ></v-text-field>
+                            </v-col>
+                            <v-col cols="auto">
+                                <v-text-field
+                                    v-model.number="webcamHeight"
+                                    label="Height"
+                                    type="number"
+                                    min="120"
+                                    max="1080"
+                                    step="1"
+                                    density="compact"
+                                    variant="outlined"
+                                ></v-text-field>
+                            </v-col>
+                            <v-col cols="auto">
+                                <v-btn color="primary" @click="toggleStream"
+                                    >{{ streaming ? 'Stop' : 'Start' }}</v-btn
+                                >
+                            </v-col>
+                            <v-col cols="auto">
+                                <v-btn @click="triggerBgUpload">Change Background</v-btn>
+                                <input
+                                    type="file"
+                                    id="bgUpload"
+                                    accept="image/*"
+                                    style="display: none"
+                                    ref="bgUploadInput"
+                                    @change="handleBgUpload"
+                                />
+                            </v-col>
+                        </v-row>
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            const video = document.getElementById('video');
+                        <!-- New Main Row for Video and Side Controls Panel -->
+                        <v-row>
+                            <v-col cols="12" md="8">
+                                <div id="container">
+                                    <video id="video" ref="videoPlayer"></video>
+                                </div>
+                            </v-col>
+                            <v-col cols="12" md="4">
+                                <v-card variant="tonal">
+                                    <v-card-title>Effect Controls</v-card-title>
+                                    <v-card-text>
+                                        <v-slider
+                                            v-model="contrast"
+                                            label="Contrast"
+                                            min="0.1"
+                                            max="4"
+                                            step="0.1"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="contrast"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="brightness"
+                                            label="Brightness"
+                                            min="-1"
+                                            max="1"
+                                            step="0.01"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="brightness"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="gamma"
+                                            label="Gamma"
+                                            min="0.1"
+                                            max="20"
+                                            step="0.1"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="gamma"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="blur"
+                                            label="Blur"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="blur"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="smoothing"
+                                            label="Smoothing Factor"
+                                            min="0.01"
+                                            max="1.0"
+                                            step="0.01"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="smoothing"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="smoothstepMin"
+                                            label="Smoothstep Min"
+                                            min="0.0"
+                                            max="1.0"
+                                            step="0.01"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="smoothstepMin"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                        <v-slider
+                                            v-model="smoothstepMax"
+                                            label="Smoothstep Max"
+                                            min="0.0"
+                                            max="1.0"
+                                            step="0.01"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="smoothstepMax"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
+                                    </v-card-text>
+                                </v-card>
+                            </v-col>
+                        </v-row>
+                    </v-container>
+                </v-main>
+            </v-app>
+        </div>
 
-            const webcamSelect = document.getElementById('webcamSelect');
-            const webcamWidth = document.getElementById('webcamWidth');
-            const webcamHeight = document.getElementById('webcamHeight');
-            const startButton = document.getElementById('startButton');
+        <script>
+            const { createApp } = Vue;
+            const { createVuetify } = Vuetify;
 
-            const smoothingInput = document.getElementById('smoothing');
-            const smoothstepMinInput = document.getElementById('smoothstepMin');
-            const smoothstepMaxInput = document.getElementById('smoothstepMax');
-            const bgUploadInput = document.getElementById('bgUpload');
-
-            const contrastInput = document.getElementById('contrast');
-            const brightnessInput = document.getElementById('brightness');
-            const gammaInput = document.getElementById('gamma');
-            const blurInput = document.getElementById('blur');
-            const sigmaInput = document.getElementById('sigma');
-            const filterInput = document.getElementById('filter');
-
-            startButton.addEventListener('click', async () => {
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach((track) => track.stop());
-                    video.srcObject = null;
-                    startButton.innerText = 'Start';
-                } else {
-                    const mediaStream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            width: { ideal: webcamWidth.value },
-                            height: { ideal: webcamHeight.value },
-                            frameRate: { ideal: 25 },
-                            deviceId: webcamSelect.value ? { exact: webcamSelect.value } : undefined,
-                        },
-                        audio: false,
-                    });
-                    const track = mediaStream.getVideoTracks()[0];
-                    const newTrack = await VirtualBackground.processVideoTrack(track, { localAssets: true });
-                    mediaStream.removeTrack(track);
-                    mediaStream.addTrack(newTrack);
-                    video.srcObject = mediaStream;
-                    video.play();
-                    startButton.innerText = 'Stop';
-                }
+            const vuetify = createVuetify({
+                theme: {
+                    defaultTheme: 'dark',
+                },
+                icons: {
+                    defaultSet: 'mdi',
+                },
             });
 
-            bgUploadInput.addEventListener('change', async (event) => {
-                const files = event.target.files;
-                if (files && files.length > 0) {
-                    const file = files[0];
-                    const imageUrl = URL.createObjectURL(file);
-                    VirtualBackground.options.backgroundImageUrl = imageUrl;
-                }
+            const app = createApp({
+                data() {
+                    return {
+                        webcams: [],
+                        selectedWebcam: null,
+                        webcamWidth: 1280,
+                        webcamHeight: 720,
+                        streaming: false,
+                        contrast: 1.0,
+                        brightness: 0,
+                        gamma: 1.0,
+                        blur: 0,
+                        smoothing: 0.75,
+                        smoothstepMin: 0.6,
+                        smoothstepMax: 0.9,
+                    };
+                },
+                watch: {
+                    contrast(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.contrast = newValue;
+                    },
+                    brightness(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.brightness = newValue;
+                    },
+                    gamma(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.gamma = newValue;
+                    },
+                    blur(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.blur = newValue;
+                    },
+                    smoothing(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.smoothing = newValue;
+                    },
+                    smoothstepMin(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.smoothstepMin = newValue;
+                    },
+                    smoothstepMax(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.smoothstepMax = newValue;
+                    },
+                },
+                methods: {
+                    async initializePage() {
+                        try {
+                            const mediaSource = await navigator.mediaDevices.getUserMedia({
+                                video: true,
+                            });
+                            mediaSource.getVideoTracks().forEach((track) => track.stop());
+
+                            const devices = await navigator.mediaDevices.enumerateDevices();
+                            this.webcams = devices
+                                .filter((device) => device.kind === 'videoinput')
+                                .map((device) => ({
+                                    title: device.label || `Camera ${this.webcams.length + 1}`,
+                                    value: device.deviceId,
+                                }));
+                        } catch (err) {
+                            console.error('Error initializing page or getting webcams:', err);
+                        }
+                    },
+                    async toggleStream() {
+                        const videoEl = this.$refs.videoPlayer;
+                        if (this.streaming) {
+                            if (videoEl && videoEl.srcObject) {
+                                videoEl.srcObject.getTracks().forEach((track) => track.stop());
+                                videoEl.srcObject = null;
+                            }
+                            this.streaming = false;
+                        } else {
+                            if (!this.selectedWebcam && this.webcams.length > 0) {
+                                console.warn(
+                                    'No webcam selected, defaulting to first available or please select one.'
+                                );
+                                this.selectedWebcam = this.webcams[0].value;
+                                if (!this.selectedWebcam) {
+                                    alert(
+                                        'No webcam available or selected. Please select a webcam.'
+                                    );
+                                    return;
+                                }
+                            }
+                            try {
+                                const streamConstraints = {
+                                    video: {
+                                        width: { ideal: this.webcamWidth },
+                                        height: { ideal: this.webcamHeight },
+                                        frameRate: { ideal: 25 },
+                                        deviceId: this.selectedWebcam
+                                            ? { exact: this.selectedWebcam }
+                                            : undefined,
+                                    },
+                                    audio: false,
+                                };
+                                const mediaStream =
+                                    await navigator.mediaDevices.getUserMedia(streamConstraints);
+                                const videoTrack = mediaStream.getVideoTracks()[0];
+
+                                const processedTrack = await VirtualBackground.processVideoTrack(
+                                    videoTrack,
+                                    { localAssets: true }
+                                );
+
+                                const finalStream = new MediaStream();
+                                finalStream.addTrack(processedTrack);
+
+                                videoEl.srcObject = finalStream;
+                                videoEl.play();
+                                this.streaming = true;
+                            } catch (err) {
+                                console.error('Error starting stream:', err);
+                                alert(
+                                    'Could not start video stream. Check permissions and console.'
+                                );
+                                this.streaming = false;
+                            }
+                        }
+                    },
+                    triggerBgUpload() {
+                        this.$refs.bgUploadInput.click();
+                    },
+                    async handleBgUpload(event) {
+                        const files = event.target.files;
+                        if (files && files.length > 0) {
+                            const file = files[0];
+                            const imageUrl = URL.createObjectURL(file);
+                            VirtualBackground.options.backgroundImageUrl = imageUrl;
+                            console.log('Background image updated to:', imageUrl);
+                        }
+                    },
+                },
+                mounted() {
+                    this.initializePage();
+                },
+                setup() {
+                    // If using Composition API primarily
+                },
             });
 
-            brightnessInput.addEventListener('input', () => {
-                VirtualBackground.options.brightness = parseFloat(brightnessInput.value);
-            });
-            contrastInput.addEventListener('input', () => {
-                VirtualBackground.options.contrast = parseFloat(contrastInput.value);
-            });
-            gammaInput.addEventListener('input', () => {
-                VirtualBackground.options.gamma = parseFloat(gammaInput.value);
-            });
-            blurInput.addEventListener('input', () => {
-                VirtualBackground.options.blur = parseFloat(blurInput.value);
-            });
-            smoothingInput.addEventListener('input', () => {
-                VirtualBackground.options.smoothing = parseFloat(smoothingInput.value);
-            });
-            smoothstepMinInput.addEventListener('input', () => {
-                VirtualBackground.options.smoothstepMin = parseFloat(smoothstepMinInput.value);
-            });
-            smoothstepMaxInput.addEventListener('input', () => {
-                VirtualBackground.options.smoothstepMax = parseFloat(smoothstepMaxInput.value);
-            });
-
-            const mediaSource = await navigator.mediaDevices.getUserMedia({ video: true });
-            mediaSource.getVideoTracks().forEach((track) => track.stop());
-            const webcams = await navigator.mediaDevices.enumerateDevices();
-            webcamSelect.childNodes.forEach((child) => child.remove());
-            webcams
-                .filter((camera) => camera.kind === 'videoinput')
-                .forEach((camera) => {
-                    const option = document.createElement('option');
-                    option.value = camera.deviceId;
-                    option.textContent = camera.label;
-                    webcamSelect.appendChild(option);
-                });
-        });
-    </script>
-</body>
-</html> 
+            app.use(vuetify).mount('#app');
+        </script>
+    </body>
+</html>

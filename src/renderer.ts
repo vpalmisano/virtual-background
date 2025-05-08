@@ -30,7 +30,7 @@ export class WebGLRenderer {
     readonly fbo: WebGLFramebuffer | null;
 
     private running = false;
-    private static readonly DEFAULT_BG_COLOR = [64, 64, 196, 255];
+    private static readonly DEFAULT_BG_COLOR = [33, 150, 243, 255];
     private currentStateIndex = 0;
     private backgroundTextureInfo: ImageTexture | null = null;
 
