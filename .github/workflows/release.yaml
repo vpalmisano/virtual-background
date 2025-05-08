@@ -1,0 +1,45 @@
+name: Build release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+    - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+jobs:
+  build:
+    name: Build release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'yarn'
+    - name: Get package version
+      id: get_package_version
+      run: |
+        version=$(sed -nE 's/^\s*"version": "(.*?)",$/\1/p' package.json)
+        echo ::set-output name=version::${version}
+    - name: Cache modules
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-node-modules-${{ hashFiles('./package-lock.json') }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-node-modules-${{ hashFiles('./package-lock.json') }}-
+    - name: Build
+      run: |
+        npm ci
+        npm run build
