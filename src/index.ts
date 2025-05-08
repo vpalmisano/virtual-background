@@ -40,6 +40,21 @@ export const options = {
     gamma: 1,
 };
 
+export function updateBackground() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+        const files = input.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            const imageUrl = URL.createObjectURL(file);
+            options.backgroundImageUrl = imageUrl;
+        }
+    };
+    input.click();
+}
+
 export async function processVideoTrack(
     track: MediaStreamTrack,
     opts?: ProcessVideoTrackOptions
