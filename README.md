@@ -7,7 +7,7 @@ This project implements a virtual background effect for webcam video streams dir
 *   Webcam video processing in real-time using mediapipe and WebGL shaders
 *   Optimized video segmenteation with adjustable filter controls (contrast, brightness, gamma, blur, strength).
 *   Demo user interface built with Vuetify 3.
-*   [Userscript](https://github.com/vpalmisano/virtual-background/raw/refs/heads/main/virtual-background.user.js) file to use the tool on every website.
+*   [Userscript](https://github.com/vpalmisano/virtual-background/raw/refs/heads/main/virtual-background.user.js) file to use the tool everywhere.
 
 ## Technologies Used
 
