@@ -2,6 +2,8 @@
 
 This project implements a virtual background effect for webcam video streams directly in the browser. It allows users to select their webcam, apply effects like blur, and change their background, similar to features found in popular video conferencing applications.
 
+[Demo page](https://vpalmisano.github.io/virtual-background/)
+
 ## Features
 
 *   Webcam video processing in real-time using mediapipe and WebGL shaders
