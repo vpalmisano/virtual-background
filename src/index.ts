@@ -103,7 +103,7 @@ export async function processVideoTrack(
     const effectsCanvas = new OffscreenCanvas(1, 1);
     const effectsGl = effectsCanvas.getContext('webgl2');
     if (!effectsGl) {
-        throw new Error('WebGL2 not supported or canvas context failed for testBlurFilter.');
+        throw new Error('WebGL2 not supported or canvas context failed.');
     }
     const videoFilter = new VideoFilter(effectsGl);
 
