@@ -26,9 +26,13 @@ try {
             const mediaStream = await nativeGetUserMedia(constraints);
             const track = mediaStream.getVideoTracks()[0];
             if (track) {
-                const newTrack = await VirtualBackground.processVideoTrack(track);
-                mediaStream.removeTrack(track);
-                mediaStream.addTrack(newTrack);
+                try {
+                    const newTrack = await VirtualBackground.processVideoTrack(track);
+                    mediaStream.removeTrack(track);
+                    mediaStream.addTrack(newTrack);
+                } catch (e) {
+                    console.error('VirtualBackground error', e)
+                }
             }
             return mediaStream;
         };
