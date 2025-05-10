@@ -34,5 +34,5 @@ try {
         };
     }
 } catch (e) {
-    console.error('Error loading virtualbackground', e);
+    console.error('Error loading virtual-background', e);
 }

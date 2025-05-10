@@ -34,6 +34,7 @@ export const options = {
     smoothstepMax: 0.9,
     localAssets: false,
     backgroundImageUrl: '',
+    enableFilters: false,
     blur: 0,
     brightness: 0,
     contrast: 1,
@@ -92,7 +93,7 @@ export async function processVideoTrack(
     if (!effectsGl) {
         throw new Error('WebGL2 not supported or canvas context failed for testBlurFilter.');
     }
-    const blurFilter = new VideoFilter(effectsGl);
+    const videoFilter = new VideoFilter(effectsGl);
 
     // Replace track.
     const trackConstraints = track.getConstraints();
@@ -106,7 +107,7 @@ export async function processVideoTrack(
         track.stop();
         segmenter.close();
         webGLRenderer.close();
-        blurFilter.destroy();
+        videoFilter.destroy();
     };
     outputTrack.getSettings = () => trackSettings;
     outputTrack.getConstraints = () => trackConstraints;
@@ -119,11 +120,11 @@ export async function processVideoTrack(
                 videoFrame.close();
                 return;
             }
-            if (options.blur > 0) {
+            if (options.enableFilters) {
                 filterVideoFrame(
                     effectsCanvas,
                     effectsGl,
-                    blurFilter,
+                    videoFilter,
                     videoFrame,
                     options.blur,
                     options.brightness,
@@ -133,7 +134,7 @@ export async function processVideoTrack(
             }
             await new Promise<void>((resolve) => {
                 segmenter.segmentForVideo(
-                    options.blur > 0 ? effectsCanvas : videoFrame,
+                    options.enableFilters ? effectsCanvas : videoFrame,
                     performance.now(),
                     // eslint-disable-next-line @typescript-eslint/no-misused-promises
                     async (result) => {
