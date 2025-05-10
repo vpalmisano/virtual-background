@@ -15,6 +15,18 @@ This project implements a virtual background effect for webcam video streams dir
 *   WebGL (for performant video filtering)
 
 ## API
+Apply a virtual background to a MediaStreamTrack:
+```js
+const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true});
+const track = mediaStream.getVideoTracks()[0];
+
+const newTrack = await VirtualBackground.processVideoTrack(track);
+mediaStream.removeTrack(track);
+mediaStream.addTrack(newTrack);
+
+// Use the mediaStream object.
+```
+
 The `VirtualBackground.options` object exported into the page DOM allows to customize
 the following options:
 
@@ -25,4 +37,4 @@ the following options:
 *   `smoothing`: (Number) Factor for temporal smoothing of the segmentation mask. Default `0.75`.
 *   `smoothstepMin`: (Number) Minimum threshold for the smoothstep function applied to the segmentation mask. Range `0.0` to `1.0`. Default `0.6`.
 *   `smoothstepMax`: (Number) Maximum threshold for the smoothstep function applied to the segmentation mask. Range `0.0` to `1.0`. Default `0.9`.
-*   `backgroundImageUrl`: (String) URL of the image to use as the virtual background. Updated via file upload in the demo or using the `VirtualBackground.updateBackground()` method.
+*   `backgroundImageUrl`: (String) URL of the image to use as the virtual background. Updated via file upload in the demo or using the `VirtualBackground.updateBackground()` method that triggers a file selector.

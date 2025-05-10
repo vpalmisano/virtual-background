@@ -28,6 +28,9 @@ export type ProcessVideoTrackOptions = {
     gamma?: number;
 };
 
+/**
+ * Configuration options for the virtual background.
+ */
 export const options = {
     smoothing: 0.8,
     smoothstepMin: 0.75,
@@ -41,6 +44,9 @@ export const options = {
     gamma: 1,
 };
 
+/**
+ * Opens a file selector to allow the user to select an image file for the virtual background.
+ */
 export function updateBackground() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -56,6 +62,12 @@ export function updateBackground() {
     input.click();
 }
 
+/**
+ * Applies a virtual background to the provided MediaStreamTrack.
+ * @param track - The MediaStreamTrack to apply the virtual background to.
+ * @param opts - Optional configuration options for the virtual background.
+ * @returns A Promise that resolves to the processed MediaStreamTrack.
+ */
 export async function processVideoTrack(
     track: MediaStreamTrack,
     opts?: ProcessVideoTrackOptions
