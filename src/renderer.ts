@@ -1,7 +1,7 @@
 export type ImageTexture = { texture: WebGLTexture; width: number; height: number; url: string };
 
 export class WebGLRenderer {
-    readonly canvas: HTMLCanvasElement;
+    readonly canvas: OffscreenCanvas;
     readonly gl: WebGL2RenderingContext;
     readonly blendProgram: WebGLProgram;
     readonly blendLocations: {
@@ -34,8 +34,8 @@ export class WebGLRenderer {
     private currentStateIndex = 0;
     private backgroundTextureInfo: ImageTexture | null = null;
 
-    constructor() {
-        this.canvas = document.createElement('canvas');
+    constructor(canvas: OffscreenCanvas) {
+        this.canvas = canvas;
         const gl = this.canvas.getContext('webgl2');
         if (!gl) throw new Error('WebGL2 not supported');
         this.gl = gl;
@@ -203,10 +203,6 @@ export class WebGLRenderer {
         this.running = true;
     }
 
-    public getVideoTrack(frameRate: number = 30): MediaStreamTrack {
-        return this.canvas.captureStream(frameRate).getVideoTracks()[0];
-    }
-
     private createAndLinkProgram(vsSource: string, fsSource: string): WebGLProgram {
         const vs = this.createShader(this.gl.VERTEX_SHADER, vsSource);
         const fs = this.createShader(this.gl.FRAGMENT_SHADER, fsSource);
@@ -240,55 +236,42 @@ export class WebGLRenderer {
         return shader;
     }
 
-    private loadImageTexture(url: string): Promise<ImageTexture | null> {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-                const texture = this.gl.createTexture();
-                if (!texture) {
-                    console.error('Failed to create texture object.');
-                    resolve(null);
-                    return;
-                }
-                this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-                this.gl.texImage2D(
-                    this.gl.TEXTURE_2D,
-                    0,
-                    this.gl.RGBA,
-                    this.gl.RGBA,
-                    this.gl.UNSIGNED_BYTE,
-                    img
-                );
-                this.gl.texParameteri(
-                    this.gl.TEXTURE_2D,
-                    this.gl.TEXTURE_WRAP_S,
-                    this.gl.CLAMP_TO_EDGE
-                );
-                this.gl.texParameteri(
-                    this.gl.TEXTURE_2D,
-                    this.gl.TEXTURE_WRAP_T,
-                    this.gl.CLAMP_TO_EDGE
-                );
-                this.gl.texParameteri(
-                    this.gl.TEXTURE_2D,
-                    this.gl.TEXTURE_MIN_FILTER,
-                    this.gl.LINEAR
-                );
-                this.gl.texParameteri(
-                    this.gl.TEXTURE_2D,
-                    this.gl.TEXTURE_MAG_FILTER,
-                    this.gl.LINEAR
-                );
-                this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-                resolve({ texture, width: img.width, height: img.height, url });
-            };
-            img.onerror = (err) => {
-                console.error('Failed to load background image:', url, err);
-                resolve(null);
-            };
-            img.src = url;
-        });
+    private async loadImageTexture(url: string): Promise<ImageTexture | null> {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const img = await createImageBitmap(blob);
+            const texture = this.gl.createTexture();
+            if (!texture) {
+                throw new Error('Failed to create texture object.');
+            }
+            this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+            this.gl.texImage2D(
+                this.gl.TEXTURE_2D,
+                0,
+                this.gl.RGBA,
+                this.gl.RGBA,
+                this.gl.UNSIGNED_BYTE,
+                img
+            );
+            this.gl.texParameteri(
+                this.gl.TEXTURE_2D,
+                this.gl.TEXTURE_WRAP_S,
+                this.gl.CLAMP_TO_EDGE
+            );
+            this.gl.texParameteri(
+                this.gl.TEXTURE_2D,
+                this.gl.TEXTURE_WRAP_T,
+                this.gl.CLAMP_TO_EDGE
+            );
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+            return { texture, width: img.width, height: img.height, url };
+        } catch (err) {
+            console.error('Failed to load background image:', url, err);
+            return null;
+        }
     }
 
     private createColorTexture(r: number, g: number, b: number, a: number): ImageTexture {
@@ -312,7 +295,6 @@ export class WebGLRenderer {
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-        console.log('Fallback color texture created.');
         return { texture, width: 1, height: 1, url: '' };
     }
 

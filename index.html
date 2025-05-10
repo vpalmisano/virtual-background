@@ -22,7 +22,7 @@
                 max-height: 70vh;
             }
         </style>
-        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/vuetify/3.7.8/vuetify.min.js"></script>
     </head>
     <body>
@@ -93,6 +93,12 @@
                                     ref="bgUploadInput"
                                     @change="handleBgUpload"
                                 />
+                            </v-col>
+                            <v-col cols="auto">
+                                <v-checkbox
+                                    v-model="runWorker"
+                                    label="Run in Web Worker"
+                                ></v-checkbox>
                             </v-col>
                         </v-row>
 
@@ -279,6 +285,7 @@
                         webcamHeight: 720,
                         streaming: false,
                         enableFilters: false,
+                        runWorker: true,
                         contrast: 1.0,
                         brightness: 0,
                         gamma: 1.0,
@@ -289,6 +296,10 @@
                     };
                 },
                 watch: {
+                    runWorker(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.runWorker = newValue;
+                    },
                     enableFilters(newValue) {
                         if (VirtualBackground && VirtualBackground.options)
                             VirtualBackground.options.enableFilters = newValue;
@@ -380,7 +391,10 @@
 
                                 const processedTrack = await VirtualBackground.processVideoTrack(
                                     videoTrack,
-                                    { localAssets: true }
+                                    {
+                                        localAssets: true,
+                                        runWorker: this.runWorker,
+                                    }
                                 );
 
                                 const finalStream = new MediaStream();
