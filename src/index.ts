@@ -1,4 +1,4 @@
-import { ImageSegmenter, FilesetResolver, ImageSegmenterResult } from '@mediapipe/tasks-vision';
+import { ImageSegmenter, FilesetResolver } from '@mediapipe/tasks-vision';
 
 import { WebGLRenderer } from './renderer';
 import { VideoFilter, filterVideoFrame } from './filter';
