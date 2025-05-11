@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         virtual-background
 // @namespace    https://github.com/vpalmisano/virtual-background
-// @version      1.0.0
+// @version      1.0.1
 // @updateURL    https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/main/virtual-background.user.js
 // @downloadURL  https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/main/virtual-background.user.js
 // @description  Virtual Background javascript browser library
@@ -9,7 +9,7 @@
 // @match        https://*/*
 // @run-at       document-start
 // @icon         https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/devel/media/logo.svg
-// @resource     JS https://unpkg.com/@vpalmisano/virtual-background-js@1.0.0/dist/virtual-background.js
+// @resource     JS https://unpkg.com/@vpalmisano/virtual-background@1.0.1/dist/virtual-background.js
 // @grant        GM_getResourceText
 // ==/UserScript==
 try {
