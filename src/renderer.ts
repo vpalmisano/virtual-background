@@ -1,5 +1,43 @@
 export type ImageTexture = { texture: WebGLTexture; width: number; height: number; url: string };
 
+type ImageInfo = {
+    type: 'image';
+    texture: WebGLTexture;
+    width: number;
+    height: number;
+    url: string;
+};
+
+type VideoInfo = {
+    type: 'video';
+    texture: WebGLTexture;
+    videoElement: HTMLVideoElement;
+    width: number;
+    height: number;
+    originalUrl: string;
+    blobUrl: string;
+};
+
+type ColorInfo = {
+    type: 'color';
+    texture: WebGLTexture;
+    color: readonly [number, number, number, number];
+};
+
+type BackgroundRenderInfo = ImageInfo | VideoInfo | ColorInfo;
+
+type LoadedImageSource = { type: 'image'; imageBitmap: ImageBitmap; url: string };
+
+type LoadedVideoSource = {
+    type: 'video';
+    videoElement: HTMLVideoElement;
+    blobUrl: string;
+    originalUrl: string;
+    width: number;
+    height: number;
+};
+type LoadedSource = LoadedImageSource | LoadedVideoSource;
+
 export class WebGLRenderer {
     readonly canvas: OffscreenCanvas;
     readonly gl: WebGL2RenderingContext;
@@ -30,9 +68,12 @@ export class WebGLRenderer {
     readonly fbo: WebGLFramebuffer | null;
 
     private running = false;
-    private static readonly DEFAULT_BG_COLOR = [33, 150, 243, 255];
+    private static readonly DEFAULT_BG_COLOR: readonly [number, number, number, number] = [
+        33, 150, 243, 255,
+    ];
     private currentStateIndex = 0;
-    private backgroundTextureInfo: ImageTexture | null = null;
+    private backgroundRenderInfo: BackgroundRenderInfo | null = null;
+    private activeBackgroundSourceIdentifier: string | null = null;
 
     constructor(canvas: OffscreenCanvas) {
         this.canvas = canvas;
@@ -236,45 +277,12 @@ export class WebGLRenderer {
         return shader;
     }
 
-    private async loadImageTexture(url: string): Promise<ImageTexture | null> {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const img = await createImageBitmap(blob);
-            const texture = this.gl.createTexture();
-            if (!texture) {
-                throw new Error('Failed to create texture object.');
-            }
-            this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-            this.gl.texImage2D(
-                this.gl.TEXTURE_2D,
-                0,
-                this.gl.RGBA,
-                this.gl.RGBA,
-                this.gl.UNSIGNED_BYTE,
-                img
-            );
-            this.gl.texParameteri(
-                this.gl.TEXTURE_2D,
-                this.gl.TEXTURE_WRAP_S,
-                this.gl.CLAMP_TO_EDGE
-            );
-            this.gl.texParameteri(
-                this.gl.TEXTURE_2D,
-                this.gl.TEXTURE_WRAP_T,
-                this.gl.CLAMP_TO_EDGE
-            );
-            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-            this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-            return { texture, width: img.width, height: img.height, url };
-        } catch (err) {
-            console.error('Failed to load background image:', url, err);
-            return null;
-        }
-    }
-
-    private createColorTexture(r: number, g: number, b: number, a: number): ImageTexture {
+    private createColorTexture(
+        r: number,
+        g: number,
+        b: number,
+        a: number
+    ): { texture: WebGLTexture; color: readonly [number, number, number, number] } {
         const texture = this.gl.createTexture();
         if (!texture) throw new Error('Failed to create texture for color');
         this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
@@ -295,28 +303,291 @@ export class WebGLRenderer {
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-        return { texture, width: 1, height: 1, url: '' };
+        return { texture, color: [r, g, b, a] as const };
     }
 
-    public async updateBackgroundImage(newImageUrl?: string): Promise<ImageTexture> {
-        const imageResult = newImageUrl ? await this.loadImageTexture(newImageUrl) : null;
+    private async loadBackgroundElement(url: string): Promise<LoadedSource | null> {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.error(
+                    `Failed to fetch background source: ${url}, status: ${response.status}`
+                );
+                return null;
+            }
 
-        if (this.backgroundTextureInfo) {
-            this.gl.deleteTexture(this.backgroundTextureInfo.texture);
+            const contentType = response.headers.get('Content-Type');
+            const blob = await response.blob();
+
+            if (contentType?.startsWith('image/')) {
+                const imageBitmap = await createImageBitmap(blob);
+                return { type: 'image', imageBitmap, url };
+            } else if (contentType?.startsWith('video/')) {
+                const blobUrl = URL.createObjectURL(blob);
+                const videoElement = document.createElement('video');
+                videoElement.src = blobUrl;
+                videoElement.crossOrigin = 'anonymous';
+                videoElement.autoplay = true;
+                videoElement.muted = true;
+                videoElement.loop = true;
+                videoElement.playsInline = true;
+
+                try {
+                    await videoElement.play();
+                    await new Promise<void>((resolve, reject) => {
+                        let resolved = false;
+                        videoElement.addEventListener(
+                            'timeupdate',
+                            () => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    resolve();
+                                }
+                            },
+                            { once: true }
+                        );
+                        videoElement.addEventListener(
+                            'error',
+                            () => {
+                                if (!resolved) {
+                                    resolved = true;
+                                    console.error(`Error loading video metadata for ${url}`);
+                                    URL.revokeObjectURL(blobUrl);
+                                    reject(new Error('Video metadata load error'));
+                                }
+                            },
+                            { once: true }
+                        );
+                        // Timeout for metadata loading
+                        setTimeout(() => {
+                            if (resolved) return;
+                            resolved = true;
+                            if (videoElement.readyState < videoElement.HAVE_METADATA) {
+                                console.warn(
+                                    `Timeout loading video metadata for ${url}. Blob URL: ${blobUrl}`
+                                );
+                                URL.revokeObjectURL(blobUrl);
+                                reject(new Error('Video metadata load timeout'));
+                            } else {
+                                resolve();
+                            }
+                        }, 5000);
+                    });
+                    return {
+                        type: 'video',
+                        videoElement,
+                        blobUrl,
+                        originalUrl: url,
+                        width: videoElement.videoWidth,
+                        height: videoElement.videoHeight,
+                    };
+                } catch (videoLoadErr) {
+                    console.error('Video setup failed after fetch:', videoLoadErr);
+                    return null;
+                }
+            } else {
+                console.warn(`Unsupported content type: ${contentType} for URL: ${url}`);
+                return null;
+            }
+        } catch (err) {
+            console.error(`Failed to load background element for URL: ${url}`, err);
+            return null;
         }
+    }
 
-        let newTextureInfo: ImageTexture;
-        if (imageResult) {
-            newTextureInfo = imageResult;
+    private async updateBackgroundIfNeeded(
+        newSourceInput?:
+            | string
+            | {
+                  r: number;
+                  g: number;
+                  b: number;
+                  a: number;
+              }
+    ): Promise<void> {
+        const gl = this.gl;
+        let newIdentifier: string;
+        let newSource = newSourceInput;
+
+        if (!newSource) {
+            const [r, g, b, a] = WebGLRenderer.DEFAULT_BG_COLOR;
+            newSource = { r, g, b, a };
+            newIdentifier = `color(${r},${g},${b},${a})`;
+        } else if (typeof newSource === 'string') {
+            newIdentifier = newSource;
         } else {
-            newTextureInfo = this.createColorTexture(
-                WebGLRenderer.DEFAULT_BG_COLOR[0],
-                WebGLRenderer.DEFAULT_BG_COLOR[1],
-                WebGLRenderer.DEFAULT_BG_COLOR[2],
-                WebGLRenderer.DEFAULT_BG_COLOR[3]
-            );
+            newIdentifier = `color(${newSource.r},${newSource.g},${newSource.b},${newSource.a})`;
         }
-        return newTextureInfo;
+
+        if (newIdentifier === this.activeBackgroundSourceIdentifier && this.backgroundRenderInfo) {
+            if (this.backgroundRenderInfo.type === 'video') {
+                const video = this.backgroundRenderInfo.videoElement;
+                if (
+                    video.readyState >= video.HAVE_METADATA &&
+                    video.videoWidth > 0 &&
+                    video.videoHeight > 0 &&
+                    (this.backgroundRenderInfo.width !== video.videoWidth ||
+                        this.backgroundRenderInfo.height !== video.videoHeight)
+                ) {
+                    this.backgroundRenderInfo.width = video.videoWidth;
+                    this.backgroundRenderInfo.height = video.videoHeight;
+                }
+            }
+            return;
+        }
+
+        if (this.backgroundRenderInfo) {
+            gl.deleteTexture(this.backgroundRenderInfo.texture);
+            if (this.backgroundRenderInfo.type === 'video') {
+                URL.revokeObjectURL(this.backgroundRenderInfo.blobUrl);
+                this.backgroundRenderInfo.videoElement.pause();
+                this.backgroundRenderInfo.videoElement.src = '';
+            }
+            this.backgroundRenderInfo = null;
+        }
+        this.activeBackgroundSourceIdentifier = newIdentifier;
+
+        if (!newSource) {
+            const [r, g, b, a] = WebGLRenderer.DEFAULT_BG_COLOR;
+            const colorTexData = this.createColorTexture(r, g, b, a);
+            this.backgroundRenderInfo = {
+                type: 'color',
+                texture: colorTexData.texture,
+                color: colorTexData.color,
+            };
+            this.activeBackgroundSourceIdentifier = `color(${r},${g},${b},${a})`;
+        } else if (typeof newSource !== 'object') {
+            const loadedData = await this.loadBackgroundElement(newSource);
+
+            if (loadedData) {
+                if (loadedData.type === 'image') {
+                    const { imageBitmap, url: imageUrl } = loadedData;
+                    const texture = this.gl.createTexture();
+                    if (!texture) {
+                        throw new Error('Failed to create texture object for image.');
+                    }
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+                    this.gl.texImage2D(
+                        this.gl.TEXTURE_2D,
+                        0,
+                        this.gl.RGBA,
+                        this.gl.RGBA,
+                        this.gl.UNSIGNED_BYTE,
+                        imageBitmap
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_WRAP_S,
+                        this.gl.CLAMP_TO_EDGE
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_WRAP_T,
+                        this.gl.CLAMP_TO_EDGE
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_MIN_FILTER,
+                        this.gl.LINEAR
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_MAG_FILTER,
+                        this.gl.LINEAR
+                    );
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+
+                    this.backgroundRenderInfo = {
+                        type: 'image',
+                        texture,
+                        width: imageBitmap.width,
+                        height: imageBitmap.height,
+                        url: imageUrl,
+                    };
+                } else if (loadedData.type === 'video') {
+                    const {
+                        videoElement,
+                        blobUrl,
+                        originalUrl: videoUrl,
+                        width,
+                        height,
+                    } = loadedData;
+                    const texture = this.gl.createTexture();
+                    if (!texture) throw new Error('Failed to create texture for video');
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+                    // Initialize texture with video dimensions, content uploaded per frame
+                    this.gl.texImage2D(
+                        this.gl.TEXTURE_2D,
+                        0,
+                        this.gl.RGBA,
+                        width || 1,
+                        height || 1,
+                        0,
+                        this.gl.RGBA,
+                        this.gl.UNSIGNED_BYTE,
+                        null
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_WRAP_S,
+                        this.gl.CLAMP_TO_EDGE
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_WRAP_T,
+                        this.gl.CLAMP_TO_EDGE
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_MIN_FILTER,
+                        this.gl.LINEAR
+                    );
+                    this.gl.texParameteri(
+                        this.gl.TEXTURE_2D,
+                        this.gl.TEXTURE_MAG_FILTER,
+                        this.gl.LINEAR
+                    );
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+
+                    this.backgroundRenderInfo = {
+                        type: 'video',
+                        texture,
+                        videoElement,
+                        width: width || 1,
+                        height: height || 1,
+                        originalUrl: videoUrl,
+                        blobUrl,
+                    };
+                }
+            }
+        } else {
+            const colorTexData = this.createColorTexture(
+                newSource.r,
+                newSource.g,
+                newSource.b,
+                newSource.a
+            );
+            this.backgroundRenderInfo = {
+                type: 'color',
+                texture: colorTexData.texture,
+                color: colorTexData.color,
+            };
+            this.activeBackgroundSourceIdentifier = `color(${newSource.r},${newSource.g},${newSource.b},${newSource.a})`;
+        }
+
+        if (!this.backgroundRenderInfo) {
+            console.error(
+                'Critical: backgroundRenderInfo is null after processing new source. Setting default color.'
+            );
+            const [r, g, b, a] = WebGLRenderer.DEFAULT_BG_COLOR;
+            const colorTexData = this.createColorTexture(r, g, b, a);
+            this.backgroundRenderInfo = {
+                type: 'color',
+                texture: colorTexData.texture,
+                color: colorTexData.color,
+            };
+            this.activeBackgroundSourceIdentifier = `color(${r},${g},${b},${a})`;
+        }
     }
 
     public async render(
@@ -327,7 +598,14 @@ export class WebGLRenderer {
             smoothing: number;
             smoothstepMin: number;
             smoothstepMax: number;
-            backgroundImageUrl: string;
+            backgroundSource?:
+                | string
+                | {
+                      r: number;
+                      g: number;
+                      b: number;
+                      a: number;
+                  };
         }
     ) {
         if (!this.running) return;
@@ -349,6 +627,8 @@ export class WebGLRenderer {
         const prevStateTexture = storedStateTextures[readStateIndex];
         const newStateTexture = storedStateTextures[writeStateIndex];
 
+        await this.updateBackgroundIfNeeded(options.backgroundSource);
+
         // --- 1. State Update Pass (Calculates Moving Average) ---
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         gl.framebufferTexture2D(
@@ -357,11 +637,11 @@ export class WebGLRenderer {
             gl.TEXTURE_2D,
             newStateTexture,
             0
-        ); // Write to new state
+        );
 
         // Ensure state texture is correctly sized
         gl.bindTexture(gl.TEXTURE_2D, newStateTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); // Resize if needed
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
         gl.viewport(0, 0, width, height);
         gl.useProgram(stateUpdateProgram);
@@ -420,30 +700,59 @@ export class WebGLRenderer {
         gl.uniform1i(blendLocations.currentStateTexture, 1);
 
         // Bind Background Texture (Unit 2)
-        if (
-            !this.backgroundTextureInfo ||
-            options.backgroundImageUrl !== this.backgroundTextureInfo.url
-        ) {
-            this.backgroundTextureInfo = await this.updateBackgroundImage(
-                options.backgroundImageUrl
-            );
-        }
-        gl.activeTexture(gl.TEXTURE2);
-        if (this.backgroundTextureInfo) {
-            // Check if texture info exists
-            gl.bindTexture(gl.TEXTURE_2D, this.backgroundTextureInfo.texture);
+        if (this.backgroundRenderInfo) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, this.backgroundRenderInfo.texture);
+
+            let bgWidth = 1,
+                bgHeight = 1; // Default for color type
+
+            if (this.backgroundRenderInfo.type === 'video') {
+                const video = this.backgroundRenderInfo.videoElement;
+                // Check if video has data and dimensions are valid
+                if (
+                    video.readyState >= video.HAVE_CURRENT_DATA &&
+                    video.videoWidth > 0 &&
+                    video.videoHeight > 0
+                ) {
+                    // Update texture from video frame if dimensions have changed or it's simply time to update
+                    if (
+                        this.backgroundRenderInfo.width !== video.videoWidth ||
+                        this.backgroundRenderInfo.height !== video.videoHeight
+                    ) {
+                        this.backgroundRenderInfo.width = video.videoWidth;
+                        this.backgroundRenderInfo.height = video.videoHeight;
+                        gl.texImage2D(
+                            gl.TEXTURE_2D,
+                            0,
+                            gl.RGBA,
+                            video.videoWidth,
+                            video.videoHeight,
+                            0,
+                            gl.RGBA,
+                            gl.UNSIGNED_BYTE,
+                            null
+                        );
+                    }
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+                }
+                bgWidth = this.backgroundRenderInfo.width;
+                bgHeight = this.backgroundRenderInfo.height;
+            } else if (this.backgroundRenderInfo.type === 'image') {
+                bgWidth = this.backgroundRenderInfo.width;
+                bgHeight = this.backgroundRenderInfo.height;
+            }
             gl.uniform1i(blendLocations.backgroundTexture, 2);
-            // Pass dimensions to shader
             gl.uniform2f(
                 blendLocations.bgImageDimensions,
-                this.backgroundTextureInfo.width,
-                this.backgroundTextureInfo.height
+                bgWidth > 0 ? bgWidth : 1,
+                bgHeight > 0 ? bgHeight : 1
             );
-            gl.uniform2f(blendLocations.canvasDimensions, width, height); // Use confidence mask dimensions (which match canvas)
+            gl.uniform2f(blendLocations.canvasDimensions, width, height);
         } else {
-            // Handle case where backgroundTextureInfo is null (should not happen if loadInitialBackground is correct)
-            // Perhaps bind a default 1x1 transparent texture or skip drawing background part
-            console.warn('backgroundTextureInfo is null in render loop');
+            console.warn(
+                'backgroundRenderInfo is null in render loop. Background may not render correctly.'
+            );
         }
 
         // Set vertex attributes
@@ -487,9 +796,15 @@ export class WebGLRenderer {
             }
         });
         this.storedStateTextures.splice(0, this.storedStateTextures.length);
-        if (this.backgroundTextureInfo?.texture) {
-            gl.deleteTexture(this.backgroundTextureInfo.texture);
-            this.backgroundTextureInfo = null;
+        if (this.backgroundRenderInfo?.texture) {
+            gl.deleteTexture(this.backgroundRenderInfo.texture);
+            if (this.backgroundRenderInfo.type === 'video') {
+                URL.revokeObjectURL(this.backgroundRenderInfo.blobUrl);
+                this.backgroundRenderInfo.videoElement.pause();
+                this.backgroundRenderInfo.videoElement.src = '';
+            }
+            this.backgroundRenderInfo = null;
         }
+        this.activeBackgroundSourceIdentifier = null;
     }
 }

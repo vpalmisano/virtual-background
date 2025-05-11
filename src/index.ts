@@ -20,7 +20,7 @@ export type ProcessVideoTrackOptions = {
     smoothstepMax: number;
     localAssets: boolean;
     runWorker: boolean;
-    backgroundImageUrl: string;
+    backgroundSource: string;
     enableFilters: boolean;
     blur: number;
     brightness: number;
@@ -34,7 +34,7 @@ export type ProcessVideoTrackOptions = {
 const opts = {
     localAssets: false,
     runWorker: false,
-    backgroundImageUrl: '',
+    backgroundSource: '',
     smoothing: 0.8,
     smoothstepMin: 0.75,
     smoothstepMax: 0.9,
@@ -62,18 +62,18 @@ export const options = new Proxy(opts, {
 });
 
 /**
- * Opens a file selector to allow the user to select an image file for the virtual background.
+ * Opens a file selector to allow the user to select a file for the virtual background.
  */
 export function updateBackground() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/*,video/*';
     input.onchange = () => {
         const files = input.files;
         if (files && files.length > 0) {
             const file = files[0];
-            const imageUrl = URL.createObjectURL(file);
-            options.backgroundImageUrl = imageUrl;
+            const url = URL.createObjectURL(file);
+            options.backgroundSource = url;
         }
     };
     input.click();

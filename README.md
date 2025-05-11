@@ -39,4 +39,4 @@ the following options:
 *   `smoothing`: (Number) Factor for temporal smoothing of the segmentation mask. Default `0.75`.
 *   `smoothstepMin`: (Number) Minimum threshold for the smoothstep function applied to the segmentation mask. Range `0.0` to `1.0`. Default `0.6`.
 *   `smoothstepMax`: (Number) Maximum threshold for the smoothstep function applied to the segmentation mask. Range `0.0` to `1.0`. Default `0.9`.
-*   `backgroundImageUrl`: (String) URL of the image to use as the virtual background. Updated via file upload in the demo or using the `VirtualBackground.updateBackground()` method that triggers a file selector.
+*   `backgroundSource`: (String) URL of the image or video to use as the virtual background. Updated via file upload in the demo or using the `VirtualBackground.updateBackground()` method that triggers a file selector.

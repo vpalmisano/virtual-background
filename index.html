@@ -88,7 +88,7 @@
                                 <input
                                     type="file"
                                     id="bgUpload"
-                                    accept="image/*"
+                                    accept="image/*,video/*"
                                     style="display: none"
                                     ref="bgUploadInput"
                                     @change="handleBgUpload"
@@ -106,8 +106,12 @@
                         <v-row>
                             <v-col cols="12" md="8">
                                 <div id="container">
-                                    <v-progress-linear v-if="progress" color="primary" indeterminate></v-progress-linear>
-                                    <video id="video" ref="videoPlayer"></video>
+                                    <v-progress-linear
+                                        v-if="progress"
+                                        color="primary"
+                                        indeterminate
+                                    ></v-progress-linear>
+                                    <video id="video" ref="videoPlayer" muted></video>
                                 </div>
                             </v-col>
                             <v-col cols="12" md="4">
@@ -425,8 +429,8 @@
                         const files = event.target.files;
                         if (files && files.length > 0) {
                             const file = files[0];
-                            const imageUrl = URL.createObjectURL(file);
-                            VirtualBackground.options.backgroundImageUrl = imageUrl;
+                            const url = URL.createObjectURL(file);
+                            VirtualBackground.options.backgroundSource = url;
                         }
                     },
                 },

@@ -3,7 +3,7 @@ import { WebGLRenderer } from './renderer';
 import { filterVideoFrame, VideoFilter } from './filter';
 import { ProcessVideoTrackOptions } from 'src';
 
-export const options = {} as ProcessVideoTrackOptions;
+export let options = {} as ProcessVideoTrackOptions;
 
 export async function runSegmenter(
     canvas: OffscreenCanvas,
@@ -11,7 +11,7 @@ export async function runSegmenter(
     opts: ProcessVideoTrackOptions
 ) {
     console.log(`runSegmenter`, { canvas, options, readable });
-    Object.assign(options, opts);
+    options = opts;
     const webGLRenderer = new WebGLRenderer(canvas);
 
     const fileset = await FilesetResolver.forVisionTasks(
