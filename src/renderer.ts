@@ -396,7 +396,7 @@ export class WebGLRenderer {
     }
 
     private async updateBackgroundIfNeeded(
-        newSourceInput?:
+        newSource?:
             | string
             | {
                   r: number;
@@ -407,7 +407,6 @@ export class WebGLRenderer {
     ): Promise<void> {
         const gl = this.gl;
         let newIdentifier: string;
-        let newSource = newSourceInput;
 
         if (!newSource) {
             const [r, g, b, a] = WebGLRenderer.DEFAULT_BG_COLOR;
