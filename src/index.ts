@@ -85,7 +85,7 @@ export function updateBackground() {
  * @param opts - Optional configuration options for the virtual background.
  * @returns A Promise that resolves to the processed MediaStreamTrack.
  */
-export function processVideoTrack(track: MediaStreamTrack, opts?: ProcessVideoTrackOptions) {
+export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessVideoTrackOptions) {
     Object.assign(options, opts);
 
     const trackSettings = track.getSettings();
@@ -120,9 +120,7 @@ export function processVideoTrack(track: MediaStreamTrack, opts?: ProcessVideoTr
             [offscreen, readable]
         );
     } else {
-        runSegmenter(offscreen, readable, options).catch((err: unknown) => {
-            console.error(`video error: ${(err as Error).message}`);
-        });
+        await runSegmenter(offscreen, readable, options);
     }
 
     return outputTrack;
