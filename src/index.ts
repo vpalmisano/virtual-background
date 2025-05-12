@@ -12,7 +12,18 @@ declare global {
             track: MediaStreamTrack;
         }) => MediaStreamTrackProcessor;
     }
+    interface HTMLVideoElement {
+        captureStream: (frameRate: number) => MediaStream;
+    }
 }
+
+export type BackgroundSource = {
+    type: string;
+    media?: ImageBitmap | ReadableStream;
+    url: string;
+    video?: HTMLVideoElement;
+    track?: MediaStreamTrack;
+};
 
 export type ProcessVideoTrackOptions = {
     smoothing: number;
@@ -20,7 +31,8 @@ export type ProcessVideoTrackOptions = {
     smoothstepMax: number;
     localAssets: boolean;
     runWorker: boolean;
-    backgroundSource: string;
+    backgroundUrl: string;
+    backgroundSource?: BackgroundSource | null;
     enableFilters: boolean;
     blur: number;
     brightness: number;
@@ -34,7 +46,7 @@ export type ProcessVideoTrackOptions = {
 const opts = {
     localAssets: false,
     runWorker: false,
-    backgroundSource: '',
+    backgroundUrl: '',
     smoothing: 0.8,
     smoothstepMin: 0.75,
     smoothstepMax: 0.9,
@@ -43,9 +55,25 @@ const opts = {
     brightness: 0,
     contrast: 1,
     gamma: 1,
-};
+} as ProcessVideoTrackOptions;
 
 let worker: Worker | null = null;
+
+function getWorkerOptions() {
+    const opts = { ...options };
+    const transferables: Transferable[] = [];
+    if (opts.backgroundSource?.media) {
+        const { type, media, url } = opts.backgroundSource;
+        opts.backgroundSource = { type, media, url };
+        transferables.push(media);
+    } else {
+        delete opts.backgroundSource;
+    }
+    if (options.backgroundSource) {
+        options.backgroundSource.media = undefined;
+    }
+    return { options: opts, transferables };
+}
 
 export const options = new Proxy(opts, {
     get: function (target, prop) {
@@ -53,30 +81,119 @@ export const options = new Proxy(opts, {
         return Reflect.get(target, prop);
     },
     set: function (target, prop, value) {
+        if (prop === 'backgroundUrl' && target.backgroundUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(target.backgroundUrl);
+        }
         const ret = Reflect.set(target, prop, value);
-        if (worker) {
-            worker.postMessage({ name: 'options', options: { ...target } });
+        if (prop === 'backgroundUrl') {
+            loadBackground()
+                .then(() => {
+                    if (worker) {
+                        const { options, transferables } = getWorkerOptions();
+                        worker.postMessage({ name: 'options', options }, transferables);
+                    }
+                })
+                .catch((err) => {
+                    console.error(`Failed to load background: ${err}`);
+                });
+        } else if (prop !== 'backgroundSource') {
+            if (worker) {
+                const { options, transferables } = getWorkerOptions();
+                worker.postMessage({ name: 'options', options }, transferables);
+            }
         }
         return ret;
     },
 });
 
+function unloadBackground() {
+    if (options.backgroundSource) {
+        options.backgroundSource.track?.stop();
+        if (options.backgroundSource.video) {
+            options.backgroundSource.video.pause();
+            options.backgroundSource.video.src = '';
+        }
+        options.backgroundSource = null;
+    }
+}
+
+async function loadBackground() {
+    console.log(`loadBackground url=${options.backgroundUrl}`);
+    unloadBackground();
+
+    const url = options.backgroundUrl;
+    if (!url) {
+        return;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+        console.error(`Failed to fetch background source ${url} (status: ${response.status})`);
+        return;
+    }
+    const contentType = response.headers.get('Content-Type');
+    const blob = await response.blob();
+
+    if (contentType?.startsWith('image/')) {
+        const imageBitmap = await createImageBitmap(blob);
+        options.backgroundSource = { type: 'image', media: imageBitmap, url };
+    } else if (contentType?.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(blob);
+        video.muted = true;
+        video.autoplay = true;
+        video.loop = true;
+        video.playsInline = true;
+        await video.play();
+
+        await new Promise<void>((resolve, reject) => {
+            video.addEventListener(
+                'timeupdate',
+                () => {
+                    resolve();
+                },
+                { once: true }
+            );
+            video.addEventListener(
+                'error',
+                () => {
+                    reject(new Error('Video load error'));
+                },
+                { once: true }
+            );
+        });
+        const track = video.captureStream(30).getVideoTracks()[0];
+        if (!track) {
+            console.error(`Failed to capture stream for video ${url} (no video track)`);
+            video.pause();
+            URL.revokeObjectURL(video.src);
+            video.src = '';
+            return;
+        }
+        const { readable } = new window.MediaStreamTrackProcessor({ track });
+        options.backgroundSource = { type: 'video', media: readable, url, video, track };
+    }
+}
+
 /**
  * Opens a file selector to allow the user to select a file for the virtual background.
  */
-export function updateBackground() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.onchange = () => {
-        const files = input.files;
-        if (files && files.length > 0) {
-            const file = files[0];
-            const url = URL.createObjectURL(file);
-            options.backgroundSource = url;
-        }
-    };
-    input.click();
+export function updateBackground(url?: string) {
+    if (!url) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,video/*';
+        input.onchange = () => {
+            const files = input.files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                const url = URL.createObjectURL(file);
+                options.backgroundUrl = url;
+            }
+        };
+        input.click();
+    } else {
+        options.backgroundUrl = url;
+    }
 }
 
 /**
@@ -99,11 +216,18 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
     const outputTrack = canvas.captureStream(frameRate).getVideoTracks()[0];
     const offscreen = canvas.transferControlToOffscreen();
 
+    await loadBackground();
+
     const outputTrackStop = outputTrack.stop.bind(outputTrack);
     outputTrack.stop = () => {
         console.log('processVideoTrack outputTrack stop');
         outputTrackStop();
         track.stop();
+        unloadBackground();
+        if (worker) {
+            worker.terminate();
+            worker = null;
+        }
     };
     outputTrack.getSettings = () => trackSettings;
     outputTrack.getConstraints = () => trackConstraints;
@@ -115,9 +239,11 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
                 /* webpackChunkName: "worker" */ new URL('./worker.ts', import.meta.url)
             );
         }
+        const { options, transferables } = getWorkerOptions();
+        transferables.push(offscreen, readable);
         worker.postMessage(
-            { name: 'runSegmenter', canvas: offscreen, readable, options: { ...options } },
-            [offscreen, readable]
+            { name: 'runSegmenter', canvas: offscreen, readable, options },
+            transferables
         );
     } else {
         await runSegmenter(offscreen, readable, options);

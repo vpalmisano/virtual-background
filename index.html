@@ -84,15 +84,7 @@
                                 >
                             </v-col>
                             <v-col cols="auto">
-                                <v-btn @click="triggerBgUpload">Change Background</v-btn>
-                                <input
-                                    type="file"
-                                    id="bgUpload"
-                                    accept="image/*,video/*"
-                                    style="display: none"
-                                    ref="bgUploadInput"
-                                    @change="handleBgUpload"
-                                />
+                                <v-btn @click="bgUpload">Change Background</v-btn>
                             </v-col>
                             <v-col cols="auto">
                                 <v-checkbox
@@ -177,7 +169,7 @@
                                         </v-slider>
                                         <v-checkbox
                                             v-model="enableFilters"
-                                            label="Enable Filters"
+                                            label="Enable Preprocessing Filters"
                                         ></v-checkbox>
                                         <v-slider
                                             v-model="contrast"
@@ -422,16 +414,8 @@
                             }
                         }
                     },
-                    triggerBgUpload() {
-                        this.$refs.bgUploadInput.click();
-                    },
-                    async handleBgUpload(event) {
-                        const files = event.target.files;
-                        if (files && files.length > 0) {
-                            const file = files[0];
-                            const url = URL.createObjectURL(file);
-                            VirtualBackground.options.backgroundSource = url;
-                        }
+                    bgUpload() {
+                        VirtualBackground.updateBackground();
                     },
                 },
                 mounted() {

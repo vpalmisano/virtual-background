@@ -69,8 +69,7 @@ export async function runSegmenter(
                 segmenter.segmentForVideo(
                     options.enableFilters ? effectsCanvas : videoFrame,
                     performance.now(),
-                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                    async (result) => {
+                    (result) => {
                         try {
                             if (
                                 !result.categoryMask ||
@@ -86,7 +85,7 @@ export async function runSegmenter(
                             const confidenceTextureMP = confidenceMask.getAsWebGLTexture();
 
                             if (categoryTextureMP && confidenceTextureMP) {
-                                await webGLRenderer.render(
+                                webGLRenderer.render(
                                     categoryTextureMP,
                                     confidenceTextureMP,
                                     videoFrame,

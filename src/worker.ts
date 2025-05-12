@@ -2,6 +2,7 @@ import { ProcessVideoTrackOptions } from 'src';
 import { runSegmenter, options } from './segmenter';
 
 self.onmessage = ({ data }) => {
+    console.log(`worker onmessage`, data);
     const { name } = data as { name: string };
     if (name === 'options') {
         const { options: opts } = data as { options: ProcessVideoTrackOptions };
