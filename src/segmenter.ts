@@ -12,7 +12,31 @@ export async function runSegmenter(
 ) {
     console.log(`runSegmenter`, { canvas, options, readable });
     options = opts;
-    const webGLRenderer = new WebGLRenderer(canvas);
+    let webGLRenderer: WebGLRenderer | null = new WebGLRenderer(canvas);
+
+    canvas.addEventListener(
+        'webglcontextlost',
+        (event) => {
+            console.log(`webglcontextlost (${!!webGLRenderer})`);
+            event.preventDefault();
+            if (webGLRenderer) {
+                webGLRenderer.close();
+                webGLRenderer = null;
+            }
+        },
+        false
+    );
+
+    canvas.addEventListener(
+        'webglcontextrestored',
+        () => {
+            console.log(`webglcontextrestored (${!!webGLRenderer})`);
+            if (!webGLRenderer) {
+                webGLRenderer = new WebGLRenderer(canvas);
+            }
+        },
+        false
+    );
 
     const fileset = await FilesetResolver.forVisionTasks(
         options.localAssets
@@ -42,7 +66,8 @@ export async function runSegmenter(
 
     function close() {
         segmenter.close();
-        webGLRenderer.close();
+        webGLRenderer?.close();
+        webGLRenderer = null;
         videoFilter.destroy();
     }
 
@@ -85,7 +110,7 @@ export async function runSegmenter(
                             const confidenceTextureMP = confidenceMask.getAsWebGLTexture();
 
                             if (categoryTextureMP && confidenceTextureMP) {
-                                webGLRenderer.render(
+                                webGLRenderer?.render(
                                     categoryTextureMP,
                                     confidenceTextureMP,
                                     videoFrame,

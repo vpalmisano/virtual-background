@@ -86,6 +86,7 @@ export const options = new Proxy(opts, {
         }
         const ret = Reflect.set(target, prop, value);
         if (prop === 'backgroundUrl') {
+            unloadBackground();
             loadBackground()
                 .then(() => {
                     if (worker) {
@@ -118,13 +119,12 @@ function unloadBackground() {
 }
 
 async function loadBackground() {
-    console.log(`loadBackground url=${options.backgroundUrl}`);
-    unloadBackground();
-
     const url = options.backgroundUrl;
     if (!url) {
         return;
     }
+    console.log(`loadBackground url=${options.backgroundUrl}`);
+
     const response = await fetch(url);
     if (!response.ok) {
         console.error(`Failed to fetch background source ${url} (status: ${response.status})`);
@@ -196,6 +196,8 @@ export function updateBackground(url?: string) {
     }
 }
 
+let refcount = 0;
+
 /**
  * Applies a virtual background to the provided MediaStreamTrack.
  * @param track - The MediaStreamTrack to apply the virtual background to.
@@ -204,6 +206,8 @@ export function updateBackground(url?: string) {
  */
 export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessVideoTrackOptions) {
     Object.assign(options, opts);
+
+    refcount++;
 
     const trackSettings = track.getSettings();
     const trackConstraints = track.getConstraints();
@@ -223,10 +227,13 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
         console.log('processVideoTrack outputTrack stop');
         outputTrackStop();
         track.stop();
-        unloadBackground();
-        if (worker) {
-            worker.terminate();
-            worker = null;
+        refcount--;
+        if (!refcount) {
+            unloadBackground();
+            if (worker) {
+                worker.terminate();
+                worker = null;
+            }
         }
     };
     outputTrack.getSettings = () => trackSettings;
