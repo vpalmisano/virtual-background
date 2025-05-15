@@ -53,7 +53,8 @@ function createAndLinkProgram(
 }
 
 export class VideoFilter {
-    private gl: WebGL2RenderingContext;
+    readonly canvas: OffscreenCanvas;
+    readonly gl: WebGL2RenderingContext;
     private blurProgram: WebGLProgram;
     private blurLocations: {
         position: number;
@@ -167,7 +168,12 @@ export class VideoFilter {
         gamma: WebGLUniformLocation | null;
     };
 
-    constructor(gl: WebGL2RenderingContext) {
+    constructor(canvas: OffscreenCanvas) {
+        this.canvas = canvas;
+        const gl = this.canvas.getContext('webgl2');
+        if (!gl) {
+            throw new Error('WebGL2 not supported or canvas context failed.');
+        }
         this.gl = gl;
 
         this.blurProgram = createAndLinkProgram(
@@ -290,7 +296,7 @@ export class VideoFilter {
         return fbo;
     }
 
-    public apply(
+    private apply(
         sourceTexture: WebGLTexture,
         outputWidth: number,
         outputHeight: number,
@@ -416,114 +422,112 @@ export class VideoFilter {
         if (this.quadBuffers.positionBuffer) gl.deleteBuffer(this.quadBuffers.positionBuffer);
         if (this.quadBuffers.texCoordBuffer) gl.deleteBuffer(this.quadBuffers.texCoordBuffer);
     }
-}
 
-export function filterVideoFrame(
-    canvas: OffscreenCanvas | HTMLCanvasElement,
-    gl: WebGL2RenderingContext,
-    blurFilterInstance: VideoFilter,
-    videoFrame: VideoFrame,
-    blur: number,
-    brightness: number = 0.0,
-    contrast: number = 1.0,
-    gamma: number = 1.0
-) {
-    const frameWidth = videoFrame.codedWidth;
-    const frameHeight = videoFrame.codedHeight;
+    public render(
+        videoFrame: VideoFrame,
+        blur: number,
+        brightness: number = 0.0,
+        contrast: number = 1.0,
+        gamma: number = 1.0
+    ) {
+        const { canvas, gl } = this;
+        const frameWidth = videoFrame.codedWidth;
+        const frameHeight = videoFrame.codedHeight;
 
-    if (canvas.width !== frameWidth || canvas.height !== frameHeight) {
-        canvas.width = frameWidth;
-        canvas.height = frameHeight;
-    }
+        if (canvas.width !== frameWidth || canvas.height !== frameHeight) {
+            canvas.width = frameWidth;
+            canvas.height = frameHeight;
+        }
 
-    if (!frameWidth || !frameHeight) {
-        throw new Error('VideoFrame has invalid dimensions for blurVideoFrame.');
-    }
+        if (!frameWidth || !frameHeight) {
+            throw new Error('VideoFrame has invalid dimensions for blurVideoFrame.');
+        }
 
-    const sourceTexture = gl.createTexture();
-    if (!sourceTexture) {
-        throw new Error('Failed to create source texture for blurVideoFrame');
-    }
-    gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoFrame);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.bindTexture(gl.TEXTURE_2D, null);
+        const sourceTexture = gl.createTexture();
+        if (!sourceTexture) {
+            throw new Error('Failed to create source texture for blurVideoFrame');
+        }
+        gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoFrame);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const finalTexture = blurFilterInstance.apply(
-        sourceTexture,
-        frameWidth,
-        frameHeight,
-        blur,
-        brightness,
-        contrast,
-        gamma
-    );
+        const finalTexture = this.apply(
+            sourceTexture,
+            frameWidth,
+            frameHeight,
+            blur,
+            brightness,
+            contrast,
+            gamma
+        );
 
-    if (!finalTexture) {
+        if (!finalTexture) {
+            gl.deleteTexture(sourceTexture);
+            throw new Error('BlurFilter.apply failed to return a texture.');
+        }
+
+        const drawVS = `#version 300 es
+            in vec2 p;
+            in vec2 t;
+            out vec2 v;
+            void main(){
+                gl_Position=vec4(p,0,1);
+                v=t;
+            }`;
+        const drawFS = `#version 300 es
+            precision mediump float;
+            in vec2 v;
+            out vec4 o;
+            uniform sampler2D tex;
+            void main(){
+                o=texture(tex,v);
+            }`;
+        const finalDrawProgram = createAndLinkProgram(gl, drawVS, drawFS);
+        const posLoc = gl.getAttribLocation(finalDrawProgram, 'p');
+        const tcLoc = gl.getAttribLocation(finalDrawProgram, 't');
+        const texLoc = gl.getUniformLocation(finalDrawProgram, 'tex');
+
+        const pBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0]),
+            gl.STATIC_DRAW
+        );
+
+        const tcBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0]),
+            gl.STATIC_DRAW
+        );
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, frameWidth, frameHeight);
+        gl.useProgram(finalDrawProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, finalTexture);
+        gl.uniform1i(texLoc, 0);
+
+        gl.enableVertexAttribArray(posLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+        gl.enableVertexAttribArray(tcLoc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);
+        gl.vertexAttribPointer(tcLoc, 2, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
         gl.deleteTexture(sourceTexture);
-        throw new Error('BlurFilter.apply failed to return a texture.');
+        gl.deleteProgram(finalDrawProgram);
+        gl.deleteBuffer(pBuf);
+        gl.deleteBuffer(tcBuf);
     }
-
-    const drawVS = `#version 300 es
-        in vec2 p;
-        in vec2 t;
-        out vec2 v;
-        void main(){
-            gl_Position=vec4(p,0,1);
-            v=t;
-        }`;
-    const drawFS = `#version 300 es
-        precision mediump float;
-        in vec2 v;
-        out vec4 o;
-        uniform sampler2D tex;
-        void main(){
-            o=texture(tex,v);
-        }`;
-    const finalDrawProgram = createAndLinkProgram(gl, drawVS, drawFS);
-    const posLoc = gl.getAttribLocation(finalDrawProgram, 'p');
-    const tcLoc = gl.getAttribLocation(finalDrawProgram, 't');
-    const texLoc = gl.getUniformLocation(finalDrawProgram, 'tex');
-
-    const pBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array([-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0]),
-        gl.STATIC_DRAW
-    );
-
-    const tcBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array([0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0]),
-        gl.STATIC_DRAW
-    );
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, frameWidth, frameHeight);
-    gl.useProgram(finalDrawProgram);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, finalTexture);
-    gl.uniform1i(texLoc, 0);
-
-    gl.enableVertexAttribArray(posLoc);
-    gl.bindBuffer(gl.ARRAY_BUFFER, pBuf);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-    gl.enableVertexAttribArray(tcLoc);
-    gl.bindBuffer(gl.ARRAY_BUFFER, tcBuf);
-    gl.vertexAttribPointer(tcLoc, 2, gl.FLOAT, false, 0, 0);
-
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    gl.deleteTexture(sourceTexture);
-    gl.deleteProgram(finalDrawProgram);
-    gl.deleteBuffer(pBuf);
-    gl.deleteBuffer(tcBuf);
 }

@@ -26,6 +26,7 @@ export type BackgroundSource = {
 };
 
 export type ProcessVideoTrackOptions = {
+    borderSmooth: number;
     smoothing: number;
     smoothstepMin: number;
     smoothstepMax: number;
@@ -47,9 +48,12 @@ const opts = {
     localAssets: false,
     runWorker: false,
     backgroundUrl: '',
+    // Segmenter options.
+    borderSmooth: 0.0,
     smoothing: 0.8,
     smoothstepMin: 0.75,
     smoothstepMax: 0.9,
+    // Filter options.
     enableFilters: false,
     blur: 0,
     brightness: 0,

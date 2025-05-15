@@ -38,6 +38,7 @@ export class WebGLRenderer {
         backgroundTexture: WebGLUniformLocation | null;
         bgImageDimensions: WebGLUniformLocation | null;
         canvasDimensions: WebGLUniformLocation | null;
+        borderSmooth: WebGLUniformLocation | null;
     };
     readonly stateUpdateProgram: WebGLProgram;
     readonly stateUpdateLocations: {
@@ -127,10 +128,17 @@ export class WebGLRenderer {
             uniform sampler2D u_backgroundTexture; // Use background texture
             uniform vec2 u_bgImageDimensions;   // Dimensions of the background image
             uniform vec2 u_canvasDimensions;    // Dimensions of the canvas
+            uniform float u_borderSmooth;
+
+            vec4 getFragColor(vec2 bgTexCoord, vec2 categoryCoord, vec2 offset) {
+                vec4 backgroundColor = texture2D(u_backgroundTexture, bgTexCoord + offset);
+                vec4 frameColor = texture2D(u_frameTexture, v_texCoord + offset);
+                float categoryValue = texture2D(u_currentStateTexture, categoryCoord + offset).r;
+                return mix(backgroundColor, frameColor, categoryValue);
+            }   
 
             void main() {
                 vec2 categoryCoord = vec2(v_texCoord.x, 1.0 - v_texCoord.y);
-                vec4 frameColor = texture2D(u_frameTexture, v_texCoord);
                 
                 // Calculate tex coords for "cover" effect
                 float canvasAspect = u_canvasDimensions.x / u_canvasDimensions.y;
@@ -152,12 +160,27 @@ export class WebGLRenderer {
                     offsetY = (1.0 - scaleY) / 2.0;
                 }
                 bgTexCoord = vec2( (v_texCoord.x - offsetX) / scaleX, (v_texCoord.y - offsetY) / scaleY );
-                vec4 backgroundColor = texture2D(u_backgroundTexture, bgTexCoord);
-                
-                float categoryValue = texture2D(u_currentStateTexture, categoryCoord).r;
                 
                 // Mix frame and background based on category state
-                gl_FragColor = mix(backgroundColor, frameColor, categoryValue);
+                vec4 color = getFragColor(bgTexCoord, categoryCoord, vec2(0.0, 0.0));
+                float categoryValue = texture2D(u_currentStateTexture, categoryCoord).r;
+                if (u_borderSmooth > 0.0 && categoryValue > 0.1 && categoryValue < 0.5) {
+                    float deltaX = u_borderSmooth / u_canvasDimensions.x;
+                    float deltaY = u_borderSmooth / u_canvasDimensions.y;
+                    vec4 sum = 
+                        color * 2.0 +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(0.0, deltaY)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, 0.0)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, deltaY)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, 0.0)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(0.0, -deltaY)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, -deltaY)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, deltaY)) +
+                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, -deltaY));
+                    gl_FragColor = sum / 10.0;
+                } else {
+                    gl_FragColor = color;
+                }
             }
         `;
         this.blendProgram = this.createAndLinkProgram(
@@ -172,6 +195,7 @@ export class WebGLRenderer {
             backgroundTexture: gl.getUniformLocation(this.blendProgram, 'u_backgroundTexture'),
             bgImageDimensions: gl.getUniformLocation(this.blendProgram, 'u_bgImageDimensions'),
             canvasDimensions: gl.getUniformLocation(this.blendProgram, 'u_canvasDimensions'),
+            borderSmooth: gl.getUniformLocation(this.blendProgram, 'u_borderSmooth'),
         };
 
         // Buffers for fullscreen quad
@@ -459,6 +483,7 @@ export class WebGLRenderer {
             smoothstepMin: number;
             smoothstepMax: number;
             backgroundSource?: BackgroundSource | null;
+            borderSmooth: number;
         }
     ) {
         if (!this.running) return;
@@ -545,6 +570,7 @@ export class WebGLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.uniform1i(blendLocations.frameTexture, 0);
+        gl.uniform1f(blendLocations.borderSmooth, options.borderSmooth);
 
         // Bind Current State Texture (Unit 1)
         const currentStateTexture = storedStateTextures[writeStateIndex]; // Use the *newly written* state

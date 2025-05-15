@@ -167,6 +167,25 @@
                                                 ></v-text-field>
                                             </template>
                                         </v-slider>
+                                        <v-slider
+                                            v-model="borderSmooth"
+                                            label="Smooth Borders"
+                                            min="0.0"
+                                            max="100.0"
+                                            step="1.0"
+                                            density="compact"
+                                        >
+                                            <template v-slot:append>
+                                                <v-text-field
+                                                    v-model="borderSmooth"
+                                                    density="compact"
+                                                    style="width: 5rem"
+                                                    type="number"
+                                                    hide-details
+                                                    single-line
+                                                ></v-text-field>
+                                            </template>
+                                        </v-slider>
                                         <v-checkbox
                                             v-model="enableFilters"
                                             label="Enable Preprocessing Filters"
@@ -292,6 +311,7 @@
                         smoothing: 0.75,
                         smoothstepMin: 0.6,
                         smoothstepMax: 0.9,
+                        borderSmooth: 0.0,
                     };
                 },
                 watch: {
@@ -330,6 +350,10 @@
                     smoothstepMax(newValue) {
                         if (VirtualBackground && VirtualBackground.options)
                             VirtualBackground.options.smoothstepMax = newValue;
+                    },
+                    borderSmooth(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.borderSmooth = newValue;
                     },
                 },
                 methods: {
