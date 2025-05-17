@@ -53,7 +53,7 @@ function createAndLinkProgram(
 }
 
 export class VideoFilter {
-    readonly canvas: OffscreenCanvas;
+    readonly canvas: OffscreenCanvas | HTMLCanvasElement;
     readonly gl: WebGL2RenderingContext;
     private blurProgram: WebGLProgram;
     private blurLocations: {
@@ -168,9 +168,9 @@ export class VideoFilter {
         gamma: WebGLUniformLocation | null;
     };
 
-    constructor(canvas: OffscreenCanvas) {
+    constructor(canvas: OffscreenCanvas | HTMLCanvasElement) {
         this.canvas = canvas;
-        const gl = this.canvas.getContext('webgl2');
+        const gl = this.canvas.getContext('webgl2') as WebGL2RenderingContext;
         if (!gl) {
             throw new Error('WebGL2 not supported or canvas context failed.');
         }
@@ -440,12 +440,12 @@ export class VideoFilter {
         }
 
         if (!frameWidth || !frameHeight) {
-            throw new Error('VideoFrame has invalid dimensions for blurVideoFrame.');
+            throw new Error('VideoFrame has invalid dimensions for videoFrame.');
         }
 
         const sourceTexture = gl.createTexture();
         if (!sourceTexture) {
-            throw new Error('Failed to create source texture for blurVideoFrame');
+            throw new Error('Failed to create source texture for videoFrame');
         }
         gl.bindTexture(gl.TEXTURE_2D, sourceTexture);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);

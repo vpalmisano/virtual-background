@@ -26,8 +26,10 @@ export async function runSegmenter(
     function onContextRestored() {
         console.log(`webglcontextrestored (${!!webGLRenderer})`);
         if (!webGLRenderer) {
-            webGLRenderer = new WebGLRenderer(canvas);
-            attachCanvasEvents();
+            setTimeout(() => {
+                webGLRenderer = new WebGLRenderer(canvas);
+                attachCanvasEvents();
+            }, 1000);
         }
     }
 
