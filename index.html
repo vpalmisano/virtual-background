@@ -294,14 +294,17 @@
 
             const app = createApp({
                 data() {
-                    return Object.assign({
-                        webcams: [],
-                        selectedWebcam: null,
-                        webcamWidth: 1280,
-                        webcamHeight: 720,
-                        streaming: false,
-                        progress: false,
-                    }, VirtualBackground.options);
+                    return Object.assign(
+                        {
+                            webcams: [],
+                            selectedWebcam: null,
+                            webcamWidth: 1280,
+                            webcamHeight: 720,
+                            streaming: false,
+                            progress: false,
+                        },
+                        VirtualBackground.options
+                    );
                 },
                 watch: {
                     runWorker(newValue) {
@@ -434,9 +437,7 @@
                 mounted() {
                     this.initializePage();
                 },
-                setup() {
-
-                },
+                setup() {},
             });
 
             app.use(vuetify).mount('#app');
