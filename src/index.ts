@@ -54,9 +54,9 @@ const opts = {
     // Segmenter options.
     borderSmooth: 0.0,
     smoothing: 0.8,
-    smoothstepMin: 0.75,
+    smoothstepMin: 0.6,
     smoothstepMax: 0.9,
-    restartEvery: 30 * 60,
+    restartEvery: 30 * 60 * 5,
     // Filter options.
     enableFilters: false,
     blur: 0,

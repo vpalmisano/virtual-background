@@ -279,7 +279,7 @@
             </v-app>
         </div>
 
-        <script>
+        <script type="module">
             const { createApp } = Vue;
             const { createVuetify } = Vuetify;
 
@@ -294,25 +294,14 @@
 
             const app = createApp({
                 data() {
-                    return {
+                    return Object.assign({
                         webcams: [],
                         selectedWebcam: null,
                         webcamWidth: 1280,
                         webcamHeight: 720,
                         streaming: false,
                         progress: false,
-                        // Virtual Background Options
-                        enableFilters: false,
-                        runWorker: false,
-                        contrast: 1.0,
-                        brightness: 0,
-                        gamma: 1.0,
-                        blur: 0,
-                        smoothing: 0.75,
-                        smoothstepMin: 0.6,
-                        smoothstepMax: 0.9,
-                        borderSmooth: 0.0,
-                    };
+                    }, VirtualBackground.options);
                 },
                 watch: {
                     runWorker(newValue) {
@@ -445,7 +434,9 @@
                 mounted() {
                     this.initializePage();
                 },
-                setup() {},
+                setup() {
+
+                },
             });
 
             app.use(vuetify).mount('#app');
