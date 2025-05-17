@@ -1,9 +1,32 @@
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
 import { WebGLRenderer } from './renderer';
-import { filterVideoFrame, VideoFilter } from './filter';
+import { VideoFilter } from './filter';
 import { ProcessVideoTrackOptions } from 'src';
 
 export let options = {} as ProcessVideoTrackOptions;
+
+async function createSegmenter(canvas: OffscreenCanvas) {
+    const localAssets = options.localAssets;
+    console.log(`createSegmenter`, { canvas, localAssets });
+    const fileset = await FilesetResolver.forVisionTasks(
+        localAssets
+            ? 'mediapipe/tasks-vision/wasm'
+            : 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+    );
+    const segmenter = await ImageSegmenter.createFromOptions(fileset, {
+        baseOptions: {
+            modelAssetPath: localAssets
+                ? 'mediapipe/models/selfie_multiclass_256x256.tflite'
+                : 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',
+            delegate: 'GPU',
+        },
+        runningMode: 'VIDEO',
+        outputCategoryMask: true,
+        outputConfidenceMasks: true,
+        canvas,
+    });
+    return segmenter;
+}
 
 export async function runSegmenter(
     canvas: OffscreenCanvas,
@@ -39,23 +62,7 @@ export async function runSegmenter(
     }
     attachCanvasEvents();
 
-    const fileset = await FilesetResolver.forVisionTasks(
-        options.localAssets
-            ? 'mediapipe/tasks-vision/wasm'
-            : 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
-    );
-    const segmenter = await ImageSegmenter.createFromOptions(fileset, {
-        baseOptions: {
-            modelAssetPath: options.localAssets
-                ? 'mediapipe/models/selfie_multiclass_256x256.tflite'
-                : 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',
-            delegate: 'GPU',
-        },
-        runningMode: 'VIDEO',
-        outputCategoryMask: true,
-        outputConfidenceMasks: true,
-        canvas,
-    });
+    let segmenter = await createSegmenter(canvas);
 
     // Filters.
     const effectsCanvas = new OffscreenCanvas(1, 1);
@@ -70,10 +77,15 @@ export async function runSegmenter(
         canvas.removeEventListener('webglcontextrestored', onContextRestored);
     }
 
+    let lastStatsTime = 0;
+    let segmenterDelayTotal = 0;
+    let frames = 0;
+    let totalFrames = 0;
+
     const writer = new WritableStream(
         {
             async write(videoFrame: VideoFrame) {
-                const { codedWidth, codedHeight } = videoFrame;
+                const { codedWidth, codedHeight, timestamp } = videoFrame;
                 if (!codedWidth || !codedHeight) {
                     videoFrame.close();
                     return;
@@ -87,10 +99,11 @@ export async function runSegmenter(
                         options.gamma
                     );
                 }
+                const start = performance.now();
                 await new Promise<void>((resolve) => {
                     segmenter.segmentForVideo(
                         options.enableFilters ? effectsCanvas : videoFrame,
-                        performance.now(),
+                        timestamp * 1000,
                         (result) => {
                             try {
                                 if (
@@ -125,6 +138,35 @@ export async function runSegmenter(
                     );
                 });
                 videoFrame.close();
+
+                // Stats report.
+                const now = performance.now();
+                segmenterDelayTotal += now - start;
+                frames++;
+                totalFrames++;
+                if (now - lastStatsTime > 5000) {
+                    const avgDelay = segmenterDelayTotal / frames;
+                    const fps = (1000 * frames) / (now - lastStatsTime);
+                    console.log(
+                        `segmenter delay: ${avgDelay.toFixed(3)}ms fps: ${fps.toFixed(3)} frames: ${frames}`
+                    );
+                    lastStatsTime = now;
+                    segmenterDelayTotal = 0;
+                    frames = 0;
+                }
+
+                // Restart segmenter to avoid memory leaks.
+                if (totalFrames % (30 * 60) === 0) {
+                    createSegmenter(canvas)
+                        .then((newSegmenter) => {
+                            const oldSegmenter = segmenter;
+                            segmenter = newSegmenter;
+                            oldSegmenter.close();
+                        })
+                        .catch((e) => {
+                            console.error('Error creating new segmenter:', e);
+                        });
+                }
             },
             close() {
                 console.log('runSegmenter close');
