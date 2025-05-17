@@ -156,7 +156,7 @@ export async function runSegmenter(
                 }
 
                 // Restart segmenter to avoid memory leaks.
-                if (totalFrames % (30 * 60) === 0) {
+                if (options.restartEvery && totalFrames % options.restartEvery === 0) {
                     createSegmenter(canvas)
                         .then((newSegmenter) => {
                             const oldSegmenter = segmenter;
@@ -164,7 +164,7 @@ export async function runSegmenter(
                             oldSegmenter.close();
                         })
                         .catch((e) => {
-                            console.error('Error creating new segmenter:', e);
+                            console.error('Error restarting segmenter:', e);
                         });
                 }
             },
