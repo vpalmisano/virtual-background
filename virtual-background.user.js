@@ -7,6 +7,7 @@
 // @description  Virtual Background javascript browser library
 // @author       Vittorio Palmisano
 // @match        https://*/*
+// @exclude      https://vpalmisano.github.io/virtual-background/*
 // @run-at       document-start
 // @icon         https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/devel/media/logo.svg
 // @resource     virtual-background.js https://unpkg.com/@vpalmisano/virtual-background@1.0.5/dist/virtual-background.js
