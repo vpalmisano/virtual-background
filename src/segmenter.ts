@@ -6,18 +6,22 @@ import { ProcessVideoTrackOptions } from 'src';
 export let options = {} as ProcessVideoTrackOptions;
 
 async function createSegmenter(canvas: OffscreenCanvas) {
-    const localAssets = options.localAssets;
-    console.log(`createSegmenter`, { canvas, localAssets });
-    const fileset = await FilesetResolver.forVisionTasks(
-        localAssets
-            ? 'mediapipe/tasks-vision/wasm'
-            : 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
-    );
+    const { wasmLoaderPath, wasmBinaryPath, modelPath } = options;
+    const fileset =
+        wasmLoaderPath && wasmBinaryPath
+            ? {
+                  wasmLoaderPath,
+                  wasmBinaryPath,
+              }
+            : await FilesetResolver.forVisionTasks(
+                  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+              );
+    console.log(`createSegmenter`, { canvas });
     const segmenter = await ImageSegmenter.createFromOptions(fileset, {
         baseOptions: {
-            modelAssetPath: localAssets
-                ? 'mediapipe/models/selfie_multiclass_256x256.tflite'
-                : 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',
+            modelAssetPath:
+                modelPath ||
+                'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',
             delegate: 'GPU',
         },
         runningMode: 'VIDEO',

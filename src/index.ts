@@ -26,7 +26,9 @@ export type BackgroundSource = {
 };
 
 export type ProcessVideoTrackOptions = {
-    localAssets: boolean;
+    wasmLoaderPath: string;
+    wasmBinaryPath: string;
+    modelPath: string;
     runWorker: boolean;
     backgroundUrl: string;
     backgroundSource?: BackgroundSource | null;
@@ -50,7 +52,9 @@ export type ProcessVideoTrackOptions = {
  * Configuration options for the virtual background.
  */
 const opts = {
-    localAssets: false,
+    wasmLoaderPath: 'mediapipe/tasks-vision/wasm/vision_wasm_internal.js',
+    wasmBinaryPath: 'mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm',
+    modelPath: 'mediapipe/models/selfie_multiclass_256x256.tflite',
     runWorker: false,
     backgroundUrl: '',
     // Segmenter options.
