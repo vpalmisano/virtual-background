@@ -36,6 +36,8 @@ export type ProcessVideoTrackOptions = {
     smoothstepMin: number;
     smoothstepMax: number;
     restartEvery: number;
+    bgBlur: number;
+    bgBlurRadius: number;
     // Filter options.
     enableFilters: boolean;
     blur: number;
@@ -57,6 +59,8 @@ const opts = {
     smoothstepMin: 0.6,
     smoothstepMax: 0.9,
     restartEvery: 30 * 60 * 5,
+    bgBlur: 0.0,
+    bgBlurRadius: 30,
     // Filter options.
     enableFilters: false,
     blur: 0,

@@ -1,4 +1,4 @@
-import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
+import { FilesetResolver, ImageSegmenter, MPMask } from '@mediapipe/tasks-vision';
 import { WebGLRenderer } from './renderer';
 import { VideoFilter } from './filter';
 import { ProcessVideoTrackOptions } from 'src';
@@ -68,6 +68,11 @@ export async function runSegmenter(
     const effectsCanvas = new OffscreenCanvas(1, 1);
     const videoFilter = new VideoFilter(effectsCanvas);
 
+    let lastStatsTime = 0;
+    let segmenterDelayTotal = 0;
+    let frames = 0;
+    let totalFrames = 0;
+
     function close() {
         segmenter.close();
         webGLRenderer?.close();
@@ -76,11 +81,6 @@ export async function runSegmenter(
         canvas.removeEventListener('webglcontextlost', onContextLost);
         canvas.removeEventListener('webglcontextrestored', onContextRestored);
     }
-
-    let lastStatsTime = 0;
-    let segmenterDelayTotal = 0;
-    let frames = 0;
-    let totalFrames = 0;
 
     const writer = new WritableStream(
         {
@@ -100,6 +100,7 @@ export async function runSegmenter(
                     );
                 }
                 const start = performance.now();
+
                 await new Promise<void>((resolve) => {
                     segmenter.segmentForVideo(
                         options.enableFilters ? effectsCanvas : videoFrame,

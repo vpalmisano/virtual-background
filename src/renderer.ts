@@ -39,6 +39,8 @@ export class WebGLRenderer {
         bgImageDimensions: WebGLUniformLocation | null;
         canvasDimensions: WebGLUniformLocation | null;
         borderSmooth: WebGLUniformLocation | null;
+        bgBlur: WebGLUniformLocation | null;
+        bgBlurRadius: WebGLUniformLocation | null;
     };
     readonly stateUpdateProgram: WebGLProgram;
     readonly stateUpdateLocations: {
@@ -123,22 +125,63 @@ export class WebGLRenderer {
         const blendFragmentShaderSource = `
             precision mediump float;
             varying vec2 v_texCoord;
+            
             uniform sampler2D u_frameTexture;
             uniform sampler2D u_currentStateTexture; // Reads the UPDATED state
             uniform sampler2D u_backgroundTexture; // Use background texture
             uniform vec2 u_bgImageDimensions;   // Dimensions of the background image
             uniform vec2 u_canvasDimensions;    // Dimensions of the canvas
             uniform float u_borderSmooth;
+            uniform float u_bgBlur;
+            uniform float u_bgBlurRadius;
 
-            vec4 getFragColor(vec2 bgTexCoord, vec2 categoryCoord, vec2 offset) {
+            const float PI = 3.141592653589793;
+            
+            float gaussianWeight(float offset, float sigma) {
+                return exp(-(offset * offset) / (2.0 * sigma * sigma));
+            }
+
+            vec4 getMixedFragColor(vec2 bgTexCoord, vec2 categoryCoord, vec2 offset) {
                 vec4 backgroundColor = texture2D(u_backgroundTexture, bgTexCoord + offset);
                 vec4 frameColor = texture2D(u_frameTexture, v_texCoord + offset);
                 float categoryValue = texture2D(u_currentStateTexture, categoryCoord + offset).r;
                 return mix(backgroundColor, frameColor, categoryValue);
-            }   
+            }
+
+            vec4 blurColor(float blur, float radius, bool mixed) {
+                vec2 categoryCoord = vec2(v_texCoord.x, 1.0 - v_texCoord.y);
+                vec2 texelSize = 1.0 / u_canvasDimensions;
+                vec4 blurredColor = vec4(0.0);
+                float totalWeight = 0.0;
+                for (float angle = 0.0; angle <= 2.0 * PI; angle += PI / 12.0) {
+                    vec2 direction = vec2(cos(angle), sin(angle));
+                    for (int i = -10; i <= 10; i++) {
+                        float offset = float(i) * (radius / 10.0);
+                        float weight = gaussianWeight(offset, blur);
+                        vec2 v_offset = direction * texelSize * offset;
+                        if (mixed) {
+                            blurredColor += getMixedFragColor(v_texCoord, categoryCoord, v_offset) * weight;
+                        } else {
+                            blurredColor += texture2D(u_frameTexture, v_texCoord + v_offset) * weight;
+                        }
+                        totalWeight += weight;
+                    }
+                }
+                return blurredColor / totalWeight;
+            }
 
             void main() {
                 vec2 categoryCoord = vec2(v_texCoord.x, 1.0 - v_texCoord.y);
+                float categoryValue = texture2D(u_currentStateTexture, categoryCoord).r;
+
+                if (u_bgBlur > 0.0 && u_bgBlurRadius > 0.0) {
+                    if (categoryValue < 0.3) {
+                        gl_FragColor = blurColor(u_bgBlur, u_bgBlurRadius, false);         
+                    } else {
+                        gl_FragColor = texture2D(u_frameTexture, v_texCoord);
+                    }
+                    return;
+                }
                 
                 // Calculate tex coords for "cover" effect
                 float canvasAspect = u_canvasDimensions.x / u_canvasDimensions.y;
@@ -161,25 +204,11 @@ export class WebGLRenderer {
                 }
                 bgTexCoord = vec2( (v_texCoord.x - offsetX) / scaleX, (v_texCoord.y - offsetY) / scaleY );
                 
-                // Mix frame and background based on category state
-                vec4 color = getFragColor(bgTexCoord, categoryCoord, vec2(0.0, 0.0));
-                float categoryValue = texture2D(u_currentStateTexture, categoryCoord).r;
-                if (u_borderSmooth > 0.0 && categoryValue > 0.1 && categoryValue < 0.5) {
-                    float deltaX = u_borderSmooth / u_canvasDimensions.x;
-                    float deltaY = u_borderSmooth / u_canvasDimensions.y;
-                    vec4 sum = 
-                        color * 2.0 +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(0.0, deltaY)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, 0.0)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, deltaY)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, 0.0)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(0.0, -deltaY)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, -deltaY)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(-deltaX, deltaY)) +
-                        getFragColor(bgTexCoord, categoryCoord, vec2(deltaX, -deltaY));
-                    gl_FragColor = sum / 10.0;
+                // Apply border smoothing
+                if (u_borderSmooth > 0.0 && categoryValue > 0.1 && categoryValue < 0.9) {
+                    gl_FragColor = blurColor(u_borderSmooth, u_bgBlurRadius, true);
                 } else {
-                    gl_FragColor = color;
+                    gl_FragColor = getMixedFragColor(bgTexCoord, categoryCoord, vec2(0.0, 0.0));
                 }
             }
         `;
@@ -196,6 +225,8 @@ export class WebGLRenderer {
             bgImageDimensions: gl.getUniformLocation(this.blendProgram, 'u_bgImageDimensions'),
             canvasDimensions: gl.getUniformLocation(this.blendProgram, 'u_canvasDimensions'),
             borderSmooth: gl.getUniformLocation(this.blendProgram, 'u_borderSmooth'),
+            bgBlur: gl.getUniformLocation(this.blendProgram, 'u_bgBlur'),
+            bgBlurRadius: gl.getUniformLocation(this.blendProgram, 'u_bgBlurRadius'),
         };
 
         // Buffers for fullscreen quad
@@ -484,6 +515,8 @@ export class WebGLRenderer {
             smoothstepMax: number;
             backgroundSource?: BackgroundSource | null;
             borderSmooth: number;
+            bgBlur: number;
+            bgBlurRadius: number;
         }
     ) {
         if (!this.running) return;
@@ -571,6 +604,8 @@ export class WebGLRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.uniform1i(blendLocations.frameTexture, 0);
         gl.uniform1f(blendLocations.borderSmooth, options.borderSmooth);
+        gl.uniform1f(blendLocations.bgBlur, options.bgBlur);
+        gl.uniform1f(blendLocations.bgBlurRadius, options.bgBlurRadius);
 
         // Bind Current State Texture (Unit 1)
         const currentStateTexture = storedStateTextures[writeStateIndex]; // Use the *newly written* state
