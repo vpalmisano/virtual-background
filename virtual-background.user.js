@@ -23,10 +23,6 @@ try {
         textContent: GM_getResourceText('virtual-background.js'),
         type: 'text/javascript'
     });
-    VirtualBackground.options.wasmLoaderPath = GM_getResourceURL('vision_wasm_internal.js');
-    VirtualBackground.options.wasmBinaryPath = GM_getResourceURL('vision_wasm_internal.wasm');
-    VirtualBackground.options.modelPath = GM_getResourceURL('selfie_multiclass_256x256.tflite');
-
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const nativeGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
         navigator.mediaDevices.getUserMedia = async function (constraints) {
@@ -34,6 +30,11 @@ try {
             const mediaStream = await nativeGetUserMedia(constraints);
             const track = mediaStream.getVideoTracks()[0];
             if (track) {
+                if (VirtualBackground.options.wasmLoaderPath.startsWith('mediapipe')) {
+                    VirtualBackground.options.wasmLoaderPath = GM_getResourceURL('vision_wasm_internal.js');
+                    VirtualBackground.options.wasmBinaryPath = GM_getResourceURL('vision_wasm_internal.wasm');
+                    VirtualBackground.options.modelPath = GM_getResourceURL('selfie_multiclass_256x256.tflite');
+                }
                 try {
                     const newTrack = await VirtualBackground.processVideoTrack(track);
                     mediaStream.removeTrack(track);
