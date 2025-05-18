@@ -32,6 +32,7 @@ export type ProcessVideoTrackOptions = {
     runWorker: boolean;
     backgroundUrl: string;
     backgroundSource?: BackgroundSource | null;
+    showStats: boolean;
     // Segmenter options.
     borderSmooth: number;
     smoothing: number;
@@ -57,6 +58,7 @@ const opts = {
     modelPath: 'mediapipe/models/selfie_multiclass_256x256.tflite',
     runWorker: false,
     backgroundUrl: '',
+    showStats: false,
     // Segmenter options.
     borderSmooth: 0.0,
     smoothing: 0.8,

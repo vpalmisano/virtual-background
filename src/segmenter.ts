@@ -2,6 +2,7 @@ import { FilesetResolver, ImageSegmenter, MPMask } from '@mediapipe/tasks-vision
 import { WebGLRenderer } from './renderer';
 import { VideoFilter } from './filter';
 import { ProcessVideoTrackOptions } from 'src';
+import { Graph } from './graph';
 
 export let options = {} as ProcessVideoTrackOptions;
 
@@ -76,6 +77,7 @@ export async function runSegmenter(
     let segmenterDelayTotal = 0;
     let frames = 0;
     let totalFrames = 0;
+    const graph = options.showStats ? new Graph() : null;
 
     function close() {
         segmenter.close();
@@ -84,6 +86,7 @@ export async function runSegmenter(
         videoFilter?.destroy();
         canvas.removeEventListener('webglcontextlost', onContextLost);
         canvas.removeEventListener('webglcontextrestored', onContextRestored);
+        graph?.remove();
     }
 
     const writer = new WritableStream(
@@ -149,12 +152,13 @@ export async function runSegmenter(
                 segmenterDelayTotal += now - start;
                 frames++;
                 totalFrames++;
-                if (now - lastStatsTime > 5000) {
+                if (now - lastStatsTime > 2000) {
                     const avgDelay = segmenterDelayTotal / frames;
                     const fps = (1000 * frames) / (now - lastStatsTime);
                     console.log(
                         `segmenter delay: ${avgDelay.toFixed(3)}ms fps: ${fps.toFixed(3)} frames: ${frames}`
                     );
+                    graph?.push(fps, 'fps');
                     lastStatsTime = now;
                     segmenterDelayTotal = 0;
                     frames = 0;
