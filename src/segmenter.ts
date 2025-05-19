@@ -56,6 +56,7 @@ export async function runSegmenter(
         if (!webGLRenderer) {
             setTimeout(() => {
                 webGLRenderer = new WebGLRenderer(canvas);
+                restartSegmenter();
                 attachCanvasEvents();
             }, 1000);
         }
@@ -68,6 +69,18 @@ export async function runSegmenter(
     attachCanvasEvents();
 
     let segmenter = await createSegmenter(canvas);
+
+    function restartSegmenter() {
+        createSegmenter(canvas)
+            .then((newSegmenter) => {
+                const oldSegmenter = segmenter;
+                segmenter = newSegmenter;
+                oldSegmenter.close();
+            })
+            .catch((e) => {
+                console.error('Error restarting segmenter:', e);
+            });
+    }
 
     // Filters.
     const effectsCanvas = new OffscreenCanvas(1, 1);
@@ -155,9 +168,9 @@ export async function runSegmenter(
                 if (now - lastStatsTime > 2000) {
                     const avgDelay = segmenterDelayTotal / frames;
                     const fps = (1000 * frames) / (now - lastStatsTime);
-                    console.log(
+                    /* console.log(
                         `segmenter delay: ${avgDelay.toFixed(3)}ms fps: ${fps.toFixed(3)} frames: ${frames}`
-                    );
+                    ); */
                     graph?.push(fps, 'fps');
                     lastStatsTime = now;
                     segmenterDelayTotal = 0;
@@ -166,15 +179,7 @@ export async function runSegmenter(
 
                 // Restart segmenter to avoid memory leaks.
                 if (options.restartEvery && totalFrames % options.restartEvery === 0) {
-                    createSegmenter(canvas)
-                        .then((newSegmenter) => {
-                            const oldSegmenter = segmenter;
-                            segmenter = newSegmenter;
-                            oldSegmenter.close();
-                        })
-                        .catch((e) => {
-                            console.error('Error restarting segmenter:', e);
-                        });
+                    restartSegmenter();
                 }
             },
             close() {

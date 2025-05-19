@@ -24,6 +24,10 @@
         </style>
         <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/vuetify/3.7.8/vuetify.min.js"></script>
+
+        <link rel="preload" href="mediapipe/tasks-vision/wasm/vision_wasm_internal.js" as="script" crossOrigin="anonymous" />
+        <link rel="preload" href="mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm" as="fetch" crossOrigin="anonymous" />
+        <link rel="preload" href="mediapipe/models/selfie_multiclass_256x256.tflite" as="fetch" crossOrigin="anonymous" />
     </head>
     <body>
         <div id="app">
@@ -309,6 +313,11 @@
                                                 ></v-text-field>
                                             </template>
                                         </v-slider>
+
+                                        <v-checkbox
+                                            v-model="showStats"
+                                            label="Show stats"
+                                        ></v-checkbox>
                                     </v-card-text>
                                 </v-card>
                             </v-col>
@@ -393,6 +402,10 @@
                     bgBlurRadius(newValue) {
                         if (VirtualBackground && VirtualBackground.options)
                             VirtualBackground.options.bgBlurRadius = newValue;
+                    },
+                    showStats(newValue) {
+                        if (VirtualBackground && VirtualBackground.options)
+                            VirtualBackground.options.showStats = newValue;
                     },
                 },
                 methods: {

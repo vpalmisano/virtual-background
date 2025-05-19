@@ -64,7 +64,7 @@ const opts = {
     smoothing: 0.8,
     smoothstepMin: 0.6,
     smoothstepMax: 0.9,
-    restartEvery: 30 * 60 * 5,
+    restartEvery: 0,
     bgBlur: 0.0,
     bgBlurRadius: 30,
     // Filter options.
