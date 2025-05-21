@@ -33,10 +33,16 @@ async function createSegmenter(canvas: OffscreenCanvas) {
     return segmenter;
 }
 
+export type SegmenterStats = {
+    fps: number;
+    delay: number;
+};
+
 export async function runSegmenter(
     canvas: OffscreenCanvas,
     readable: ReadableStream,
-    opts: ProcessVideoTrackOptions
+    opts: ProcessVideoTrackOptions,
+    onStats: (stats: SegmenterStats) => void
 ) {
     console.log(`runSegmenter`, { canvas, options, readable });
     options = opts;
@@ -90,7 +96,6 @@ export async function runSegmenter(
     let segmenterDelayTotal = 0;
     let frames = 0;
     let totalFrames = 0;
-    const graph = options.showStats ? new Graph() : null;
 
     function close() {
         segmenter.close();
@@ -99,7 +104,6 @@ export async function runSegmenter(
         videoFilter?.destroy();
         canvas.removeEventListener('webglcontextlost', onContextLost);
         canvas.removeEventListener('webglcontextrestored', onContextRestored);
-        graph?.remove();
     }
 
     const writer = new WritableStream(
@@ -110,54 +114,56 @@ export async function runSegmenter(
                     videoFrame.close();
                     return;
                 }
-                if (options.enableFilters) {
-                    videoFilter.render(
-                        videoFrame,
-                        options.blur,
-                        options.brightness,
-                        options.contrast,
-                        options.gamma
-                    );
-                }
                 const start = performance.now();
-
-                await new Promise<void>((resolve) => {
-                    segmenter.segmentForVideo(
-                        options.enableFilters ? effectsCanvas : videoFrame,
-                        timestamp * 1000,
-                        (result) => {
-                            try {
-                                if (
-                                    !result.categoryMask ||
-                                    !result.confidenceMasks ||
-                                    !result.confidenceMasks[0]
-                                ) {
-                                    console.warn('Skipping frame: Missing masks or WebGL data.');
-                                    return;
-                                }
-                                const categoryMask = result.categoryMask;
-                                const confidenceMask = result.confidenceMasks[0];
-                                const categoryTextureMP = categoryMask.getAsWebGLTexture();
-                                const confidenceTextureMP = confidenceMask.getAsWebGLTexture();
-
-                                if (categoryTextureMP && confidenceTextureMP) {
+                if (options.enabled) {
+                    if (options.enableFilters) {
+                        videoFilter.render(
+                            videoFrame,
+                            options.blur,
+                            options.brightness,
+                            options.contrast,
+                            options.gamma
+                        );
+                    }
+                    await new Promise<void>((resolve) => {
+                        segmenter.segmentForVideo(
+                            options.enableFilters ? effectsCanvas : videoFrame,
+                            timestamp * 1000,
+                            (result) => {
+                                try {
+                                    if (
+                                        !result.categoryMask ||
+                                        !result.confidenceMasks ||
+                                        !result.confidenceMasks[0]
+                                    ) {
+                                        console.warn(
+                                            'Skipping frame: Missing masks or WebGL data.'
+                                        );
+                                        return;
+                                    }
+                                    const categoryMask = result.categoryMask;
+                                    const confidenceMask = result.confidenceMasks[0];
+                                    const categoryTextureMP = categoryMask.getAsWebGLTexture();
+                                    const confidenceTextureMP = confidenceMask.getAsWebGLTexture();
                                     webGLRenderer?.render(
-                                        categoryTextureMP,
-                                        confidenceTextureMP,
                                         videoFrame,
-                                        options
+                                        options,
+                                        categoryTextureMP,
+                                        confidenceTextureMP
                                     );
+                                    categoryMask.close();
+                                    confidenceMask.close();
+                                } catch (e) {
+                                    console.error('Error in videoCallback:', e);
+                                } finally {
+                                    resolve();
                                 }
-                                categoryMask.close();
-                                confidenceMask.close();
-                            } catch (e) {
-                                console.error('Error in videoCallback:', e);
-                            } finally {
-                                resolve();
                             }
-                        }
-                    );
-                });
+                        );
+                    });
+                } else {
+                    webGLRenderer?.render(videoFrame, options);
+                }
                 videoFrame.close();
 
                 // Stats report.
@@ -166,12 +172,9 @@ export async function runSegmenter(
                 frames++;
                 totalFrames++;
                 if (now - lastStatsTime > 2000) {
-                    const avgDelay = segmenterDelayTotal / frames;
+                    const delay = segmenterDelayTotal / frames;
                     const fps = (1000 * frames) / (now - lastStatsTime);
-                    /* console.log(
-                        `segmenter delay: ${avgDelay.toFixed(3)}ms fps: ${fps.toFixed(3)} frames: ${frames}`
-                    ); */
-                    graph?.push(fps, 'fps');
+                    onStats({ delay, fps });
                     lastStatsTime = now;
                     segmenterDelayTotal = 0;
                     frames = 0;

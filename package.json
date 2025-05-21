@@ -1,6 +1,6 @@
 {
   "name": "@vpalmisano/virtual-background",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "author": {
     "name": "Vittorio Palmisano",
     "url": "https://github.com/vpalmisano"
@@ -26,6 +26,7 @@
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304"
   },
   "devDependencies": {
+    "@types/three": "^0.176.0",
     "@typescript-eslint/eslint-plugin": "^8.32.0",
     "@typescript-eslint/parser": "^8.32.0",
     "copy-webpack-plugin": "^13.0.0",

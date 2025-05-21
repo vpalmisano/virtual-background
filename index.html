@@ -25,9 +25,24 @@
         <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/vuetify/3.7.8/vuetify.min.js"></script>
 
-        <link rel="preload" href="mediapipe/tasks-vision/wasm/vision_wasm_internal.js" as="script" crossOrigin="anonymous" />
-        <link rel="preload" href="mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm" as="fetch" crossOrigin="anonymous" />
-        <link rel="preload" href="mediapipe/models/selfie_multiclass_256x256.tflite" as="fetch" crossOrigin="anonymous" />
+        <link
+            rel="preload"
+            href="mediapipe/tasks-vision/wasm/vision_wasm_internal.js"
+            as="script"
+            crossorigin="anonymous"
+        />
+        <link
+            rel="preload"
+            href="mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm"
+            as="fetch"
+            crossorigin="anonymous"
+        />
+        <link
+            rel="preload"
+            href="mediapipe/models/selfie_multiclass_256x256.tflite"
+            as="fetch"
+            crossorigin="anonymous"
+        />
     </head>
     <body>
         <div id="app">
@@ -94,6 +109,7 @@
                                 <v-checkbox
                                     v-model="runWorker"
                                     label="Run in Web Worker"
+                                    density="compact"
                                 ></v-checkbox>
                             </v-col>
                         </v-row>
@@ -114,6 +130,18 @@
                                 <v-card variant="tonal">
                                     <v-card-title>Effect Controls</v-card-title>
                                     <v-card-text>
+                                        <v-checkbox
+                                            v-model="enabled"
+                                            label="Enable Virtual Background"
+                                            density="compact"
+                                        ></v-checkbox>
+
+                                        <v-checkbox
+                                            v-model="showStats"
+                                            label="Show stats"
+                                            density="compact"
+                                        ></v-checkbox>
+
                                         <v-slider
                                             v-model="smoothing"
                                             label="Smoothing Factor"
@@ -232,6 +260,7 @@
                                         <v-checkbox
                                             v-model="enableFilters"
                                             label="Enable Preprocessing Filters"
+                                            density="compact"
                                         ></v-checkbox>
                                         <v-slider
                                             v-model="contrast"
@@ -313,11 +342,6 @@
                                                 ></v-text-field>
                                             </template>
                                         </v-slider>
-
-                                        <v-checkbox
-                                            v-model="showStats"
-                                            label="Show stats"
-                                        ></v-checkbox>
                                     </v-card-text>
                                 </v-card>
                             </v-col>
@@ -356,56 +380,46 @@
                 },
                 watch: {
                     runWorker(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.runWorker = newValue;
+                        VirtualBackground.options.runWorker = newValue;
                     },
-                    enableFilters(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.enableFilters = newValue;
-                    },
-                    contrast(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.contrast = newValue;
-                    },
-                    brightness(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.brightness = newValue;
-                    },
-                    gamma(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.gamma = newValue;
-                    },
-                    blur(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.blur = newValue;
-                    },
-                    smoothing(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.smoothing = newValue;
-                    },
-                    smoothstepMin(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.smoothstepMin = newValue;
-                    },
-                    smoothstepMax(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.smoothstepMax = newValue;
-                    },
-                    borderSmooth(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.borderSmooth = newValue;
-                    },
-                    bgBlur(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.bgBlur = newValue;
-                    },
-                    bgBlurRadius(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.bgBlurRadius = newValue;
+                    enabled(newValue) {
+                        VirtualBackground.options.enabled = newValue;
                     },
                     showStats(newValue) {
-                        if (VirtualBackground && VirtualBackground.options)
-                            VirtualBackground.options.showStats = newValue;
+                        VirtualBackground.options.showStats = newValue;
+                    },
+                    enableFilters(newValue) {
+                        VirtualBackground.options.enableFilters = newValue;
+                    },
+                    contrast(newValue) {
+                        VirtualBackground.options.contrast = newValue;
+                    },
+                    brightness(newValue) {
+                        VirtualBackground.options.brightness = newValue;
+                    },
+                    gamma(newValue) {
+                        VirtualBackground.options.gamma = newValue;
+                    },
+                    blur(newValue) {
+                        VirtualBackground.options.blur = newValue;
+                    },
+                    smoothing(newValue) {
+                        VirtualBackground.options.smoothing = newValue;
+                    },
+                    smoothstepMin(newValue) {
+                        VirtualBackground.options.smoothstepMin = newValue;
+                    },
+                    smoothstepMax(newValue) {
+                        VirtualBackground.options.smoothstepMax = newValue;
+                    },
+                    borderSmooth(newValue) {
+                        VirtualBackground.options.borderSmooth = newValue;
+                    },
+                    bgBlur(newValue) {
+                        VirtualBackground.options.bgBlur = newValue;
+                    },
+                    bgBlurRadius(newValue) {
+                        VirtualBackground.options.bgBlurRadius = newValue;
                     },
                 },
                 methods: {

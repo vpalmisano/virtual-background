@@ -1,5 +1,5 @@
 import { ProcessVideoTrackOptions } from 'src';
-import { runSegmenter, options } from './segmenter';
+import { runSegmenter, options, SegmenterStats } from './segmenter';
 
 self.onmessage = ({ data }) => {
     console.log(`worker onmessage`, data);
@@ -17,7 +17,9 @@ self.onmessage = ({ data }) => {
             readable: ReadableStream;
             options: ProcessVideoTrackOptions;
         };
-        runSegmenter(canvas, readable, opts).catch((err: unknown) => {
+        runSegmenter(canvas, readable, opts, (stats: SegmenterStats) => {
+            self.postMessage({ name: 'stats', stats });
+        }).catch((err: unknown) => {
             console.error(`video error: ${(err as Error).message}`);
         });
     }

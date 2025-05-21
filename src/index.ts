@@ -1,4 +1,5 @@
-import { runSegmenter } from './segmenter';
+import { Graph } from './graph';
+import { runSegmenter, SegmenterStats } from './segmenter';
 
 type MediaStreamTrackProcessor = {
     readable: ReadableStream;
@@ -30,6 +31,7 @@ export type ProcessVideoTrackOptions = {
     wasmBinaryPath: string;
     modelPath: string;
     runWorker: boolean;
+    enabled: boolean;
     backgroundUrl: string;
     backgroundSource?: BackgroundSource | null;
     showStats: boolean;
@@ -57,6 +59,7 @@ const opts = {
     wasmBinaryPath: 'mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm',
     modelPath: 'mediapipe/models/selfie_multiclass_256x256.tflite',
     runWorker: false,
+    enabled: true,
     backgroundUrl: '',
     showStats: false,
     // Segmenter options.
@@ -237,6 +240,23 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
     const canvas = document.createElement('canvas');
     const outputTrack = canvas.captureStream(frameRate).getVideoTracks()[0];
     const offscreen = canvas.transferControlToOffscreen();
+    let graph: Graph | null = null;
+
+    function onStats(stats: SegmenterStats) {
+        if (options.showStats) {
+            const { fps, delay } = stats;
+            console.log(`segmenter delay: ${delay.toFixed(3)}ms fps: ${fps.toFixed(3)}`);
+            if (!graph) {
+                graph = new Graph();
+            }
+            graph.push(fps, 'fps');
+        } else {
+            if (graph) {
+                graph.remove();
+                graph = null;
+            }
+        }
+    }
 
     await loadBackground();
 
@@ -253,6 +273,10 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
                 worker = null;
             }
         }
+        if (graph) {
+            graph.remove();
+            graph = null;
+        }
     };
     outputTrack.getSettings = () => trackSettings;
     outputTrack.getConstraints = () => trackConstraints;
@@ -264,14 +288,20 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
                 /* webpackChunkName: "worker" */ new URL('./worker.ts', import.meta.url)
             );
         }
-        const { options, transferables } = getWorkerOptions();
+        const { options: workerOptions, transferables } = getWorkerOptions();
         transferables.push(offscreen, readable);
         worker.postMessage(
-            { name: 'runSegmenter', canvas: offscreen, readable, options },
+            { name: 'runSegmenter', canvas: offscreen, readable, options: workerOptions },
             transferables
         );
+        worker.addEventListener('message', ({ data }) => {
+            const { name, stats } = data as { name: string; stats: SegmenterStats };
+            if (name === 'stats') {
+                onStats(stats);
+            }
+        });
     } else {
-        await runSegmenter(offscreen, readable, options);
+        await runSegmenter(offscreen, readable, options, onStats);
     }
 
     return outputTrack;
