@@ -213,7 +213,7 @@ export class WebGLRenderer {
                 
                 // Apply border smoothing
                 if (u_borderSmooth > 0.0 && categoryValue > 0.1 && categoryValue < 0.9) {
-                    gl_FragColor = blurColor(u_borderSmooth, u_bgBlurRadius, true);
+                    gl_FragColor = blurColor(u_borderSmooth, u_bgBlurRadius, false);
                 } else {
                     gl_FragColor = getMixedFragColor(bgTexCoord, categoryCoord, vec2(0.0, 0.0));
                 }
