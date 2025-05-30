@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         virtual-background
 // @namespace    https://github.com/vpalmisano/virtual-background
-// @version      1.0.5
+// @version      1.0.7
 // @updateURL    https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/main/virtual-background.user.js
 // @downloadURL  https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/main/virtual-background.user.js
 // @description  Virtual Background javascript browser library
@@ -10,7 +10,7 @@
 // @exclude      https://vpalmisano.github.io/virtual-background/*
 // @run-at       document-start
 // @icon         https://raw.githubusercontent.com/vpalmisano/virtual-background/refs/heads/devel/media/logo.svg
-// @resource     virtual-background.js https://unpkg.com/@vpalmisano/virtual-background@1.0.5/dist/virtual-background.js
+// @resource     virtual-background.js https://unpkg.com/@vpalmisano/virtual-background@1.0.7/dist/virtual-background.js
 // @resource     vision_wasm_internal.js https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm/vision_wasm_internal.js
 // @resource     vision_wasm_internal.wasm https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm/vision_wasm_internal.wasm
 // @resource     selfie_multiclass_256x256.tflite https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite
