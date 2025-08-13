@@ -97,10 +97,10 @@ export class WebGLRenderer {
 
                 float nonLinearConfidence = smoothstep(u_smoothstepMin, u_smoothstepMax, confidenceValue);
                 float prevCategoryValue = texture2D(u_prevStateTexture, prevCoord).r;
-                float alpha = u_smoothingFactor * nonLinearConfidence; 
+                float alpha = u_smoothingFactor * nonLinearConfidence;
                 float newCategoryValue = alpha * categoryValue + (1.0 - alpha) * prevCategoryValue;
-                
-                gl_FragColor = vec4(newCategoryValue, nonLinearConfidence, 0.0, 0.0); 
+
+                gl_FragColor = vec4(newCategoryValue, nonLinearConfidence, 0.0, 0.0);
             }
         `;
         this.stateUpdateProgram = this.createAndLinkProgram(
@@ -126,7 +126,7 @@ export class WebGLRenderer {
         const blendFragmentShaderSource = `
             precision mediump float;
             varying vec2 v_texCoord;
-            
+
             uniform sampler2D u_frameTexture;
             uniform sampler2D u_currentStateTexture; // Reads the UPDATED state
             uniform sampler2D u_backgroundTexture; // Use background texture
@@ -138,7 +138,7 @@ export class WebGLRenderer {
             uniform int u_enabled;
 
             const float PI = 3.141592653589793;
-            
+
             float gaussianWeight(float offset, float sigma) {
                 return exp(-(offset * offset) / (2.0 * sigma * sigma));
             }
@@ -183,17 +183,17 @@ export class WebGLRenderer {
 
                 if (u_bgBlur > 0.0 && u_bgBlurRadius > 0.0) {
                     if (categoryValue < 0.3) {
-                        gl_FragColor = blurColor(u_bgBlur, u_bgBlurRadius, false);         
+                        gl_FragColor = blurColor(u_bgBlur, u_bgBlurRadius, false);
                     } else {
                         gl_FragColor = texture2D(u_frameTexture, v_texCoord);
                     }
                     return;
                 }
-                
+
                 // Calculate tex coords for "cover" effect
                 float canvasAspect = u_canvasDimensions.x / u_canvasDimensions.y;
                 float bgAspect = u_bgImageDimensions.x / u_bgImageDimensions.y;
-                
+
                 vec2 bgTexCoord = v_texCoord;
                 float scaleX = 1.0;
                 float scaleY = 1.0;
@@ -210,7 +210,7 @@ export class WebGLRenderer {
                     offsetY = (1.0 - scaleY) / 2.0;
                 }
                 bgTexCoord = vec2( (v_texCoord.x - offsetX) / scaleX, (v_texCoord.y - offsetY) / scaleY );
-                
+
                 // Apply border smoothing
                 if (u_borderSmooth > 0.0 && categoryValue > 0.1 && categoryValue < 0.9) {
                     gl_FragColor = blurColor(u_borderSmooth, u_bgBlurRadius, false);
@@ -445,7 +445,7 @@ export class WebGLRenderer {
                         videoFrame.close();
                     },
                     close() {
-                        console.log('video background close');
+                        console.log('[virtual-background] video background close');
                     },
                 });
                 media.pipeTo(writer).catch((err) => {

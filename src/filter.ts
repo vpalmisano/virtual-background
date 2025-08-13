@@ -92,12 +92,12 @@ export class VideoFilter {
         out vec4 FragColor; // Standard output for GLSL 300 es
 
         uniform sampler2D u_image;
-        uniform vec2 u_resolution; 
-        uniform vec2 u_direction;  
-        uniform float u_blur;     
+        uniform vec2 u_resolution;
+        uniform vec2 u_direction;
+        uniform float u_blur;
 
         const float PI = 3.141592653589793;
-        
+
         float gaussianWeight(float offset, float sigma) {
             return exp(-(offset * offset) / (2.0 * sigma * sigma));
         }
@@ -112,7 +112,7 @@ export class VideoFilter {
             vec4 blurredColor = vec4(0.0);
             float totalWeight = 0.0;
 
-            int radius = int(min(10.0, ceil(2.5 * u_blur))); 
+            int radius = int(min(10.0, ceil(2.5 * u_blur)));
 
             for (int i = -radius; i <= radius; ++i) {
                 float offset = float(i);
@@ -141,19 +141,19 @@ export class VideoFilter {
 
         void main() {
             vec4 color = texture(u_inputTexture, v_texCoord);
-            
+
             // Apply brightness
             color.rgb += u_brightness;
-            
+
             // Apply contrast
             color.rgb = (color.rgb - 0.5) * u_contrast + 0.5;
-            
+
             // Apply gamma correction
             // Ensure gamma is not zero to avoid division by zero
             if (u_gamma > 0.0) {
                 color.rgb = pow(color.rgb, vec3(1.0 / u_gamma));
             }
-            
+
             FragColor = clamp(color, 0.0, 1.0);
         }
     `;

@@ -31,6 +31,7 @@ export type ProcessVideoTrackOptions = {
     wasmBinaryPath: string;
     modelPath: string;
     runWorker: boolean;
+    // Virtual background options.
     enabled: boolean;
     backgroundUrl: string;
     backgroundSource?: BackgroundSource | null;
@@ -144,11 +145,13 @@ async function loadBackground() {
     if (!url) {
         return;
     }
-    console.log(`loadBackground url=${options.backgroundUrl}`);
+    console.log(`[virtual-background] loadBackground url=${options.backgroundUrl}`);
 
     const response = await fetch(url);
     if (!response.ok) {
-        console.error(`Failed to fetch background source ${url} (status: ${response.status})`);
+        console.error(
+            `[virtual-background] Failed to fetch background source ${url} (status: ${response.status})`
+        );
         return;
     }
     const contentType = response.headers.get('Content-Type');
@@ -230,10 +233,15 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
 
     refcount++;
 
+    const trackCapabilities = track.getCapabilities();
     const trackSettings = track.getSettings();
     const trackConstraints = track.getConstraints();
     const { width, height, frameRate } = trackSettings;
-    console.log(`processVideoTrack: ${width}x${height} ${frameRate}fps`);
+    console.log(`[virtual-background] processVideoTrack: ${width}x${height} ${frameRate}fps`, {
+        trackCapabilities,
+        trackSettings,
+        trackConstraints,
+    });
 
     const { readable } = new window.MediaStreamTrackProcessor({ track });
 
@@ -245,7 +253,9 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
     function onStats(stats: SegmenterStats) {
         if (options.showStats) {
             const { fps, delay } = stats;
-            console.log(`segmenter delay: ${delay.toFixed(3)}ms fps: ${fps.toFixed(3)}`);
+            console.log(
+                `[virtual-background] segmenter delay: ${delay.toFixed(3)}ms fps: ${fps.toFixed(3)}`
+            );
             if (!graph) {
                 graph = new Graph();
             }
@@ -262,7 +272,7 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
 
     const outputTrackStop = outputTrack.stop.bind(outputTrack);
     outputTrack.stop = () => {
-        console.log('processVideoTrack outputTrack stop');
+        console.log('[virtual-background] processVideoTrack outputTrack stop');
         outputTrackStop();
         track.stop();
         refcount--;
@@ -278,6 +288,7 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
             graph = null;
         }
     };
+    outputTrack.getCapabilities = () => trackCapabilities;
     outputTrack.getSettings = () => trackSettings;
     outputTrack.getConstraints = () => trackConstraints;
     track.addEventListener('ended', () => outputTrack.stop());

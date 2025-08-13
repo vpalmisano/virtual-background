@@ -2,7 +2,7 @@ import { ProcessVideoTrackOptions } from 'src';
 import { runSegmenter, options, SegmenterStats } from './segmenter';
 
 self.onmessage = ({ data }) => {
-    console.log(`worker onmessage`, data);
+    console.log(`[virtual-background] worker onmessage`, data);
     const { name } = data as { name: string };
     if (name === 'options') {
         const { options: opts } = data as { options: ProcessVideoTrackOptions };
@@ -20,7 +20,7 @@ self.onmessage = ({ data }) => {
         runSegmenter(canvas, readable, opts, (stats: SegmenterStats) => {
             self.postMessage({ name: 'stats', stats });
         }).catch((err: unknown) => {
-            console.error(`video error: ${(err as Error).message}`);
+            console.error(`[virtual-background] video error: ${(err as Error).message}`);
         });
     }
 };

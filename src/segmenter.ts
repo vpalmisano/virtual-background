@@ -17,7 +17,7 @@ async function createSegmenter(canvas: OffscreenCanvas) {
             : await FilesetResolver.forVisionTasks(
                   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
               );
-    console.log(`createSegmenter`, { canvas });
+    console.log(`[virtual-background] createSegmenter`, { canvas });
     const segmenter = await ImageSegmenter.createFromOptions(fileset, {
         baseOptions: {
             modelAssetPath:
@@ -44,12 +44,12 @@ export async function runSegmenter(
     opts: ProcessVideoTrackOptions,
     onStats: (stats: SegmenterStats) => void
 ) {
-    console.log(`runSegmenter`, { canvas, options, readable });
+    console.log(`[virtual-background] runSegmenter`, { canvas, options, readable });
     options = opts;
     let webGLRenderer: WebGLRenderer | null = new WebGLRenderer(canvas);
 
     function onContextLost(event: Event) {
-        console.log(`webglcontextlost (${!!webGLRenderer})`);
+        console.log(`[virtual-background] webglcontextlost (${!!webGLRenderer})`);
         event.preventDefault();
         if (webGLRenderer) {
             webGLRenderer.close();
@@ -58,7 +58,7 @@ export async function runSegmenter(
     }
 
     function onContextRestored() {
-        console.log(`webglcontextrestored (${!!webGLRenderer})`);
+        console.log(`[virtual-background] webglcontextrestored (${!!webGLRenderer})`);
         if (!webGLRenderer) {
             setTimeout(() => {
                 webGLRenderer = new WebGLRenderer(canvas);
@@ -186,11 +186,11 @@ export async function runSegmenter(
                 }
             },
             close() {
-                console.log('runSegmenter close');
+                console.log('[virtual-background] runSegmenter close');
                 close();
             },
             abort(reason) {
-                console.log('runSegmenter abort', reason);
+                console.log('[virtual-background] runSegmenter abort', reason);
                 close();
             },
         },
@@ -198,6 +198,6 @@ export async function runSegmenter(
     );
 
     readable.pipeTo(writer).catch((err: unknown) => {
-        console.error(`video error: ${(err as Error).message}`);
+        console.error(`[virtual-background] video error: ${(err as Error).message}`);
     });
 }
