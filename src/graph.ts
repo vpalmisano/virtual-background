@@ -45,12 +45,12 @@ export class Graph {
         const { width, height } = this.canvas;
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, width, height);
-        ctx.fillStyle = 'darkred';
+        ctx.fillStyle = 'darkblue';
         const w = width / this.data.length;
         const max = Math.max(...this.data);
         this.data.forEach((value, i) => {
             const h = (height * value) / max;
-            ctx.fillRect(i * w, height - h, w - 1, h);
+            ctx.fillRect(i * w, height - h, w, h);
         });
         if (this.data.length) {
             ctx.fillStyle = 'white';
