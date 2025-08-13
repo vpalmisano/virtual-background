@@ -69,7 +69,11 @@ export class WebGLRenderer {
 
     constructor(canvas: OffscreenCanvas) {
         this.canvas = canvas;
-        const gl = this.canvas.getContext('webgl2');
+        const gl = this.canvas.getContext('webgl2', {
+            alpha: false,
+            antialias: false,
+            desynchronized: true,
+        });
         if (!gl) throw new Error('WebGL2 not supported');
         this.gl = gl;
 
