@@ -195,6 +195,47 @@ async function loadBackground() {
         }
         const { readable } = new window.MediaStreamTrackProcessor({ track });
         options.backgroundSource = { type: 'video', media: readable, url, video, track };
+    } else {
+        console.warn(
+            `[virtual-background] Unsupported background source type: ${contentType} for ${url}`
+        );
+        return;
+    }
+    console.log(`[virtual-background] Background source loaded`, options.backgroundSource);
+}
+
+export async function saveBackground(file: File) {
+    console.log(`[virtual-background] saveBackground`, file);
+    const storageRoot = await navigator.storage.getDirectory();
+    {
+        const handle = await storageRoot.getFileHandle(`background`, { create: true });
+        const fd = await handle.createWritable();
+        const blob = new Blob([file], { type: file.type });
+        await fd.write(blob);
+        await fd.close();
+    }
+    {
+        const handle = await storageRoot.getFileHandle(`background_type`, { create: true });
+        const fd = await handle.createWritable();
+        await fd.write(file.type);
+        await fd.close();
+    }
+}
+
+export async function loadBackgroundFromStorage() {
+    try {
+        const storageRoot = await navigator.storage.getDirectory();
+        const handle = await storageRoot.getFileHandle(`background`);
+        const file = await handle.getFile();
+        const handleType = await storageRoot.getFileHandle(`background_type`);
+        const type = await (await handleType.getFile()).text();
+        const newFile = new File([file], 'background', { type });
+        console.log(`[virtual-background] loadBackgroundFromStorage`, newFile);
+        const url = URL.createObjectURL(newFile);
+        options.backgroundUrl = url;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+        // If the file does not exist, we simply ignore the error.
     }
 }
 
@@ -206,12 +247,13 @@ export function updateBackground(url?: string) {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*,video/*';
-        input.onchange = () => {
+        input.onchange = async () => {
             const files = input.files;
             if (files && files.length > 0) {
                 const file = files[0];
                 const url = URL.createObjectURL(file);
                 options.backgroundUrl = url;
+                await saveBackground(file);
             }
         };
         input.click();
@@ -268,7 +310,7 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
         }
     }
 
-    await loadBackground();
+    await loadBackgroundFromStorage();
 
     const outputTrackStop = outputTrack.stop.bind(outputTrack);
     outputTrack.stop = () => {
