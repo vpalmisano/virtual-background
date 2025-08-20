@@ -516,13 +516,15 @@
 
             app.use(vuetify).mount('#app');
 
-            try {
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', 'G-05SF29M4QB');
-            } catch (error) {
-                console.error('Error initializing Google Analytics:', error);
+            if (window.location.hostname !== '127.0.0.1') {
+                try {
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', 'G-05SF29M4QB');
+                } catch (error) {
+                    console.error('Error initializing Google Analytics:', error);
+                }
             }
         </script>
     </body>

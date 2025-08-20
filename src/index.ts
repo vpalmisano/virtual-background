@@ -1,18 +1,8 @@
 import { Graph } from './graph';
 import { runSegmenter, SegmenterStats } from './segmenter';
-
-type MediaStreamTrackProcessor = {
-    readable: ReadableStream;
-};
+import { TrackProcessor } from './processor';
 
 declare global {
-    interface Window {
-        MediaStreamTrackProcessor: new ({
-            track,
-        }: {
-            track: MediaStreamTrack;
-        }) => MediaStreamTrackProcessor;
-    }
     interface HTMLVideoElement {
         captureStream: (frameRate: number) => MediaStream;
     }
@@ -193,7 +183,7 @@ async function loadBackground() {
             video.src = '';
             return;
         }
-        const { readable } = new window.MediaStreamTrackProcessor({ track });
+        const { readable } = new TrackProcessor({ track });
         options.backgroundSource = { type: 'video', media: readable, url, video, track };
     } else {
         console.warn(
@@ -285,7 +275,7 @@ export async function processVideoTrack(track: MediaStreamTrack, opts?: ProcessV
         trackConstraints,
     });
 
-    const { readable } = new window.MediaStreamTrackProcessor({ track });
+    const { readable } = new TrackProcessor({ track });
 
     const canvas = document.createElement('canvas');
     const outputTrack = canvas.captureStream(frameRate).getVideoTracks()[0];
