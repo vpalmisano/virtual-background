@@ -1,8 +1,8 @@
 import { setTimeout } from 'worker-timers';
 
-type MediaStreamTrackProcessor = {
+interface MediaStreamTrackProcessor {
     readable: ReadableStream;
-};
+}
 
 declare global {
     interface Window {
@@ -14,7 +14,7 @@ declare global {
     }
 }
 
-class FallbackProcessor {
+class FallbackProcessor implements MediaStreamTrackProcessor {
     readonly readable: ReadableStream;
 
     constructor({ track }: { track: MediaStreamTrack }) {
