@@ -46,6 +46,7 @@ export async function runSegmenter(
 ) {
     console.log(`[virtual-background] runSegmenter`, { canvas, options, readable });
     options = opts;
+
     let webGLRenderer: WebGLRenderer | null = new WebGLRenderer(canvas);
 
     function onContextLost(event: Event) {
@@ -92,6 +93,7 @@ export async function runSegmenter(
     const effectsCanvas = new OffscreenCanvas(1, 1);
     const videoFilter = new VideoFilter(effectsCanvas);
 
+    const useSelfieModel = options.modelPath?.includes('selfie_segmenter') ? true : false;
     let lastStatsTime = 0;
     let segmenterDelayTotal = 0;
     let frames = 0;
@@ -149,7 +151,8 @@ export async function runSegmenter(
                                         videoFrame,
                                         options,
                                         categoryTextureMP,
-                                        confidenceTextureMP
+                                        confidenceTextureMP,
+                                        useSelfieModel
                                     );
                                     categoryMask.close();
                                     confidenceMask.close();

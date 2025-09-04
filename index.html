@@ -74,6 +74,18 @@
                                     placeholder="Select Webcam"
                                 ></v-select>
                             </v-col>
+                            <v-col cols="4">
+                                <v-select
+                                    :items="modelOptions"
+                                    item-title="title"
+                                    item-value="value"
+                                    v-model="modelPath"
+                                    label="Model"
+                                    density="compact"
+                                    variant="outlined"
+                                    @change="handleModelChange"
+                                ></v-select>
+                            </v-col>
                             <v-col cols="auto">
                                 <v-text-field
                                     v-model.number="webcamWidth"
@@ -142,6 +154,8 @@
                                             label="Show stats"
                                             density="compact"
                                         ></v-checkbox>
+
+
 
                                         <v-slider
                                             v-model="smoothing"
@@ -375,6 +389,11 @@
                             webcamHeight: 720,
                             streaming: false,
                             progress: false,
+                            modelPath: 'mediapipe/models/selfie_multiclass_256x256.tflite',
+                            modelOptions: [
+                                { title: 'Selfie', value: 'mediapipe/models/selfie_segmenter.tflite' },
+                                { title: 'Multiclass', value: 'mediapipe/models/selfie_multiclass_256x256.tflite' },
+                            ],
                         },
                         VirtualBackground.options
                     );
@@ -385,6 +404,13 @@
                     },
                     enabled(newValue) {
                         VirtualBackground.options.enabled = newValue;
+                    },
+                    modelPath(newValue) {
+                        VirtualBackground.options.modelPath = newValue;
+                        if (this.streaming) {
+                            this.toggleStream(); // Stop current stream
+                            this.toggleStream(); // Restart with new model
+                        }
                     },
                     showStats(newValue) {
                         VirtualBackground.options.showStats = newValue;

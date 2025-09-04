@@ -53,6 +53,7 @@ export class WebGLRenderer {
         smoothingFactor: WebGLUniformLocation | null;
         smoothstepMin: WebGLUniformLocation | null;
         smoothstepMax: WebGLUniformLocation | null;
+        selfieModel: WebGLUniformLocation | null;
     };
     readonly positionBuffer: WebGLBuffer | null;
     readonly texCoordBuffer: WebGLBuffer | null;
@@ -88,11 +89,17 @@ export class WebGLRenderer {
             uniform float u_smoothingFactor;     // Alpha for moving average
             uniform float u_smoothstepMin;       // Lower edge for smoothstep
             uniform float u_smoothstepMax;       // Upper edge for smoothstep
+            uniform int u_selfieModel;
 
             void main() {
                 vec2 prevCoord = vec2(v_texCoord.x, 1.0 - v_texCoord.y);
                 float categoryValue = texture2D(u_categoryTexture, v_texCoord).r;
                 float confidenceValue = texture2D(u_confidenceTexture, v_texCoord).r;
+
+                if (u_selfieModel == 1) {
+                    categoryValue = 1.0 - categoryValue;
+                    confidenceValue = 1.0 - confidenceValue;
+                }
 
                 if (categoryValue > 0.0) {
                     categoryValue = 1.0;
@@ -104,7 +111,7 @@ export class WebGLRenderer {
                 float alpha = u_smoothingFactor * nonLinearConfidence;
                 float newCategoryValue = alpha * categoryValue + (1.0 - alpha) * prevCategoryValue;
 
-                gl_FragColor = vec4(newCategoryValue, nonLinearConfidence, 0.0, 0.0);
+                gl_FragColor = vec4(newCategoryValue, 0.0, 0.0, 0.0);
             }
         `;
         this.stateUpdateProgram = this.createAndLinkProgram(
@@ -123,6 +130,7 @@ export class WebGLRenderer {
             smoothingFactor: gl.getUniformLocation(this.stateUpdateProgram, 'u_smoothingFactor'),
             smoothstepMin: gl.getUniformLocation(this.stateUpdateProgram, 'u_smoothstepMin'),
             smoothstepMax: gl.getUniformLocation(this.stateUpdateProgram, 'u_smoothstepMax'),
+            selfieModel: gl.getUniformLocation(this.stateUpdateProgram, 'u_selfieModel'),
         };
 
         // Blending Shader
@@ -529,7 +537,8 @@ export class WebGLRenderer {
             bgBlurRadius: number;
         },
         categoryTexture?: WebGLTexture,
-        confidenceTexture?: WebGLTexture
+        confidenceTexture?: WebGLTexture,
+        useSelfieModel?: boolean
     ) {
         if (!this.running) return;
         const {
@@ -542,7 +551,7 @@ export class WebGLRenderer {
             blendLocations,
         } = this;
 
-        const { codedWidth: width, codedHeight: height } = videoFrame;
+        const { displayWidth: width, displayHeight: height } = videoFrame;
         if (this.canvas.width !== width || this.canvas.height !== height) {
             this.canvas.width = width;
             this.canvas.height = height;
@@ -619,6 +628,9 @@ export class WebGLRenderer {
         gl.uniform1f(stateUpdateLocations.smoothingFactor, options.smoothing);
         gl.uniform1f(stateUpdateLocations.smoothstepMin, options.smoothstepMin);
         gl.uniform1f(stateUpdateLocations.smoothstepMax, options.smoothstepMax);
+
+        // Set selfie model flag
+        gl.uniform1i(stateUpdateLocations.selfieModel, useSelfieModel ? 1 : 0);
 
         // Set vertex attributes
         gl.enableVertexAttribArray(stateUpdateLocations.position);
